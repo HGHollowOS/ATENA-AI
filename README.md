@@ -1,32 +1,43 @@
-# ATENAAI - Advanced Task Execution and Natural Language Assistant AI
+# ATENA-AI - Proactive Business Assistant on Discord
 
-ATENAAI is a sophisticated AI assistant system that combines natural language processing, task execution, and self-improvement capabilities. The system is designed to be modular, extensible, and efficient.
+ATENA-AI is an intelligent business assistant that operates proactively on Discord, supporting company tasks through natural conversation and autonomous research capabilities. The system combines advanced natural language processing with business intelligence to provide valuable insights and automate routine tasks.
 
-## Features
+## Core Features
 
-### Core Components
-- **Meta-Agent**: System performance monitoring and self-improvement
-- **Input Processor**: Text and voice input handling
-- **Natural Language Understanding**: Intent analysis and entity extraction
-- **Dialogue Manager**: Conversation context and state management
-- **Knowledge Base**: Data storage and retrieval
-- **Task Executor**: Task scheduling and execution
-- **External Services**: API integration and service management
+### 1. Proactive Business Intelligence
+- Autonomous research of business opportunities
+- Partnership lead identification and analysis
+- Market trend monitoring and reporting
+- Automated email draft generation
+- Proactive notifications for important findings
 
-### Key Features
-- Self-improvement through meta-agent
-- Comprehensive logging and monitoring
-- Modular architecture for easy extension
-- Support for text and voice input
-- Integration with external services
-- Task scheduling and prioritization
+### 2. Natural Discord Interaction
+- Conversational interface with @mentions
+- Smart filtering of team chatter
+- Command-based operations
+- Context-aware responses
+- Multi-turn dialogue support
+
+### 3. Self-Improvement Capabilities
+- Performance monitoring and optimization
+- Chain-of-thought evaluation
+- Autonomous parameter adjustments
+- Learning from interaction outcomes
+- Proactive system updates
+
+### 4. Business Workflow Automation
+- Partnership research and analysis
+- Email draft generation
+- Report creation
+- Task scheduling and tracking
+- Meeting preparation
 
 ## Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/ATENAAI.git
-cd ATENAAI
+git clone https://github.com/HGHollowOS/ATENA-AI.git
+cd ATENA-AI
 ```
 
 2. Create and activate a virtual environment:
@@ -43,221 +54,133 @@ pip install -r requirements.txt
 4. Set up environment variables:
 ```bash
 cp .env.example .env
-# Edit .env with your configuration
+# Edit .env with your Discord bot token and other configurations
 ```
 
 ## How to Use
 
-### 1. Basic Setup
+### 1. Discord Integration
 
-First, initialize the system with your configuration:
-
+#### Basic Commands
 ```python
-from src.main import ATENAAI
-from src.logging.logger import Logger
+# Start the Discord bot
+python src/discord_bot.py
 
-# Initialize logger
-logger = Logger()
-
-# Create ATENAAI instance
-atenai = ATENAAI(logger)
-
-# Start the system
-await atenai.start()
+# The bot will now listen for:
+# - Direct mentions (@ATENA-AI)
+# - Command prefixes (!)
+# - Proactive notifications
 ```
 
-### 2. Task Management
+#### Natural Conversation
+```
+User: @ATENA-AI, did you find any interesting partnerships?
+ATENA-AI: I've been researching potential partnerships in the tech sector. I found three promising leads:
+1. TechCorp - AI solutions provider
+2. DataFlow - Data analytics platform
+3. CloudScale - Cloud infrastructure
 
-#### Creating Tasks
-```python
-from src.executor.task_executor import TaskExecutor
-
-# Create a task
-task = await task_executor.create_task(
-    title="Process Data",
-    description="Process and analyze the dataset",
-    priority="HIGH",
-    deadline="2024-03-20"
-)
-
-# Add subtasks
-subtask = await task_executor.add_subtask(
-    parent_task_id=task.id,
-    title="Data Cleaning",
-    description="Clean and preprocess the data"
-)
+Would you like me to investigate any of these further?
 ```
 
-#### Managing Tasks
-```python
-# Update task status
-await task_executor.update_status(task.id, "IN_PROGRESS")
-
-# Add task notes
-await task_executor.add_note(task.id, "Data validation completed")
-
-# Set task priority
-await task_executor.set_priority(task.id, "HIGH")
+#### Proactive Notifications
+```
+ATENA-AI: I've identified a potential partnership opportunity with InnovateTech. 
+They're expanding into our market and have complementary products. 
+Would you like me to draft an outreach email?
 ```
 
-### 3. Natural Language Interaction
+### 2. Business Intelligence
 
-#### Text Input
+#### Partnership Research
 ```python
-from src.input_processor import InputProcessor
+from src.business.business_module import BusinessModule
 
-# Process text input
-response = await input_processor.process_text(
-    "Schedule a meeting with John tomorrow at 2 PM"
-)
-```
+# Initialize business module
+business = BusinessModule()
 
-#### Voice Input
-```python
-# Process voice input
-response = await input_processor.process_voice(
-    audio_file="meeting_request.wav"
-)
-```
-
-### 4. Knowledge Base Operations
-
-```python
-from src.knowledge.knowledge_base import KnowledgeBase
-
-# Store information
-await knowledge_base.store(
-    key="user_preferences",
-    value={"theme": "dark", "language": "en"}
-)
-
-# Retrieve information
-preferences = await knowledge_base.retrieve("user_preferences")
-
-# Update information
-await knowledge_base.update(
-    key="user_preferences",
-    value={"theme": "light"}
-)
-```
-
-### 5. External Service Integration
-
-```python
-from src.services.external_services import ExternalServices
-
-# Register external service
-external_services.register_service(
-    name="email_service",
-    service_type="EMAIL",
-    config={
-        "smtp_server": "smtp.example.com",
-        "port": 587
+# Research partnerships
+partnerships = await business.research_partnerships(
+    industry="AI",
+    region="North America",
+    criteria={
+        "min_revenue": "10M",
+        "tech_stack": ["Python", "AI/ML"]
     }
 )
+```
 
-# Use external service
-await external_services.send_email(
-    to="user@example.com",
-    subject="Task Update",
-    body="Your task has been completed"
+#### Email Generation
+```python
+# Generate outreach email
+email = await business.generate_email(
+    company="TechCorp",
+    purpose="partnership",
+    tone="professional",
+    key_points=["AI expertise", "market expansion"]
 )
 ```
 
-### 6. Error Handling
+### 3. Self-Improvement
 
 ```python
-from src.utils.error_handler import ErrorHandler, ErrorSeverity, ErrorCategory
+from src.meta_agent import MetaAgent
+from src.self_improvement import SelfImprovement
 
-# Handle errors with retry mechanism
-try:
-    result = await some_operation()
-except Exception as e:
-    await error_handler.handle_error(
-        error=e,
-        component="my_component",
-        operation="some_operation",
-        severity=ErrorSeverity.MEDIUM,
-        category=ErrorCategory.SYSTEM,
-        retry=True
-    )
-```
+# Initialize components
+meta_agent = MetaAgent()
+self_improvement = SelfImprovement()
 
-### 7. Monitoring and Logging
-
-```python
-# Get system metrics
+# Monitor performance
 metrics = await meta_agent.get_metrics()
 
-# Check system health
-health_status = await meta_agent.check_health()
-
-# Get performance statistics
-performance_stats = await meta_agent.get_performance_stats()
+# Trigger self-improvement if needed
+if await self_improvement.evaluate_performance(metrics):
+    await self_improvement.trigger_auto_update()
 ```
 
-### 8. Configuration
+### 4. Configuration
 
-The system can be configured through environment variables:
+Configure the system through environment variables:
 
 ```env
-# Core Settings
-DEBUG=false
-LOG_LEVEL=INFO
-ENVIRONMENT=development
+# Discord Configuration
+DISCORD_BOT_TOKEN=your_bot_token
+DISCORD_CLIENT_ID=your_client_id
+DISCORD_GUILD_IDS=your_guild_ids
 
-# API Keys
-OPENAI_API_KEY=your_openai_api_key
-DISCORD_BOT_TOKEN=your_discord_bot_token
+# Business Intelligence
+PARTNERSHIP_CRITERIA={"industry": "AI", "min_revenue": "10M"}
+RESEARCH_INTERVAL=3600  # seconds
+NOTIFICATION_THRESHOLD=0.8
 
-# Service Configuration
-REDIS_HOST=localhost
-REDIS_PORT=6379
+# Email Configuration
+EMAIL_TEMPLATE_DIR=templates/email
+SMTP_SERVER=smtp.example.com
+SMTP_PORT=587
 
-# Error Handling
-MAX_RETRY_ATTEMPTS=3
-CIRCUIT_BREAKER_THRESHOLD=5
+# Self-Improvement
+LEARNING_RATE=0.1
+UPDATE_THRESHOLD=0.7
 ```
-
-### 9. Best Practices
-
-1. **Error Handling**
-   - Always use appropriate error severity levels
-   - Implement retry mechanisms for transient failures
-   - Use circuit breakers for external services
-
-2. **Task Management**
-   - Break down complex tasks into subtasks
-   - Set realistic deadlines
-   - Use appropriate priority levels
-
-3. **Resource Management**
-   - Clean up resources after use
-   - Monitor system performance
-   - Implement proper logging
-
-4. **Security**
-   - Never commit sensitive information
-   - Use environment variables for secrets
-   - Implement proper authentication
 
 ## Project Structure
 
 ```
-ATENAAI/
+ATENA-AI/
 ├── src/
-│   ├── meta_agent/      # System monitoring and self-improvement
-│   ├── input_processor/ # Input handling
-│   ├── nlu/            # Natural language understanding
-│   ├── dialogue/       # Dialogue management
-│   ├── knowledge/      # Knowledge base
-│   ├── executor/       # Task execution
-│   ├── services/       # External services
-│   └── logging/        # Logging system
-├── tests/              # Test files
-├── docs/              # Documentation
-├── requirements.txt   # Dependencies
-└── README.md         # This file
+│   ├── discord_bot/      # Discord integration
+│   ├── meta_agent/       # System monitoring
+│   ├── self_improvement/ # Self-improvement logic
+│   ├── business/         # Business intelligence
+│   ├── dialogue/         # Conversation management
+│   ├── knowledge/        # Knowledge base
+│   └── logging/          # Logging system
+├── tests/                # Test files
+├── templates/            # Email templates
+├── docs/                # Documentation
+├── requirements.txt     # Dependencies
+└── README.md           # This file
 ```
 
 ## Development
@@ -288,198 +211,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - Thanks to all contributors
 - Built with modern Python technologies
-- Inspired by the need for intelligent task management
-
-# ATENAAI Error Handling System
-
-A comprehensive error handling system with retry mechanisms, circuit breakers, and recovery strategies.
-
-## Features
-
-- **Error Management**
-  - Custom exception classes
-  - Error categorization
-  - Error tracking
-  - Error reporting
-
-- **Recovery Mechanisms**
-  - Retry strategies with exponential backoff
-  - Circuit breakers for external services
-  - Fallback mechanisms
-  - State recovery
-
-- **Monitoring**
-  - Error metrics collection
-  - Error pattern analysis
-  - Circuit breaker status
-  - Recovery statistics
-
-## Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/HGHollowOS/ATENA-AI.git
-   cd ATENA-AI
-   ```
-
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Usage
-
-### Basic Error Handling
-
-```python
-from src.utils.error_handler import ErrorHandler, ErrorSeverity, ErrorCategory
-from src.logging.logger import Logger
-
-# Create instances
-logger = Logger()
-error_handler = ErrorHandler(logger)
-
-# Handle errors
-try:
-    result = some_operation()
-except Exception as e:
-    await error_handler.handle_error(
-        error=e,
-        component="my_component",
-        operation="some_operation",
-        severity=ErrorSeverity.MEDIUM,
-        category=ErrorCategory.SYSTEM
-    )
-```
-
-### Circuit Breaker Pattern
-
-```python
-# Register circuit breaker
-error_handler.register_circuit_breaker(
-    component="external_service",
-    failure_threshold=5,
-    reset_timeout=60
-)
-
-# Use circuit breaker
-try:
-    result = await external_service_call()
-except Exception as e:
-    await error_handler.handle_error(
-        error=e,
-        component="external_service",
-        operation="external_service_call",
-        severity=ErrorSeverity.HIGH,
-        category=ErrorCategory.EXTERNAL
-    )
-```
-
-### Retry Strategy
-
-```python
-# Register retry strategy
-error_handler.register_retry_strategy(
-    component="database",
-    max_attempts=3,
-    base_delay=1.0,
-    max_delay=10.0
-)
-
-# Use retry mechanism
-try:
-    result = await database_query()
-except Exception as e:
-    await error_handler.handle_error(
-        error=e,
-        component="database",
-        operation="database_query",
-        severity=ErrorSeverity.MEDIUM,
-        category=ErrorCategory.DATABASE,
-        retry=True
-    )
-```
-
-### Error Handler Decorator
-
-```python
-from src.utils.error_handler import handle_errors
-
-@handle_errors(
-    component="api",
-    severity=ErrorSeverity.MEDIUM,
-    category=ErrorCategory.SYSTEM,
-    retry=True
-)
-async def api_call(error_handler=None):
-    response = await make_api_request()
-    return response
-```
-
-### Error Monitoring
-
-```python
-# Get error metrics
-metrics = await error_handler.get_error_metrics()
-
-# Check circuit breaker status
-circuit_status = metrics["circuit_breakers"]["external_service"]["state"]
-
-# Check recovery statistics
-recovery_stats = metrics["recovery_stats"]
-```
-
-## Error Categories and Severities
-
-### Error Severities
-- `LOW`: Minor issues that don't affect core functionality
-- `MEDIUM`: Moderate issues that may affect some features
-- `HIGH`: Serious issues that affect core functionality
-- `CRITICAL`: Critical issues that require immediate attention
-
-### Error Categories
-- `SYSTEM`: System-level errors
-- `NETWORK`: Network-related errors
-- `DATABASE`: Database errors
-- `VALIDATION`: Validation errors
-- `SECURITY`: Security-related errors
-- `BUSINESS`: Business logic errors
-- `EXTERNAL`: External service errors
-
-## Testing
-
-Run the test suite:
-```bash
-pytest tests/ -v
-```
-
-## Configuration
-
-The error handling system can be configured through environment variables:
-
-```env
-# Logging
-LOG_LEVEL=INFO
-LOG_FORMAT=json
-
-# Error Handling
-MAX_RETRY_ATTEMPTS=3
-BASE_RETRY_DELAY=1.0
-MAX_RETRY_DELAY=10.0
-
-# Circuit Breaker
-CIRCUIT_BREAKER_THRESHOLD=5
-CIRCUIT_BREAKER_TIMEOUT=60
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details. 
+- Inspired by the need for intelligent business assistance 

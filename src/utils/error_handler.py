@@ -37,7 +37,7 @@ from collections import defaultdict
 import json
 from pathlib import Path
 
-from logging.logger import Logger, LogLevel, LogCategory
+from src.logging.logger import Logger, LogLevel, LogCategory
 
 class ErrorSeverity(Enum):
     """Enum for error severity levels."""
@@ -240,7 +240,11 @@ class ErrorHandler:
             
             # Attempt recovery if enabled
             if retry and component in self.retry_strategies:
-                return await self._attempt_recovery(error_context)
+                result = await self._attempt_recovery(error_context)
+                # Store error context after recovery attempt
+                async with self._lock:
+                    self.error_contexts.append(error_context)
+                return result
             
             # Store error context
             async with self._lock:

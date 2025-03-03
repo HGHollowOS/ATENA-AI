@@ -1,0 +1,160 @@
+{
+    "log_dir": "logs",
+    "max_log_size": 10485760,
+    "backup_count": 5,
+    "debug_mode": false,
+    "components": {
+        "meta_agent": {
+            "self_improvement_interval": 3600,
+            "performance_threshold": 0.8,
+            "max_improvement_attempts": 3,
+            "metrics_collection_interval": 300,
+            "cache_ttl": 3600,
+            "max_history_size": 1000
+        },
+        "input_processor": {
+            "max_input_length": 1000,
+            "language_detection": true,
+            "sentiment_analysis": true,
+            "entity_extraction": true,
+            "cache_size": 1000,
+            "cache_ttl": 3600,
+            "batch_size": 10
+        },
+        "intent_analyzer": {
+            "confidence_threshold": 0.7,
+            "max_entities": 10,
+            "cache_size": 1000,
+            "cache_ttl": 3600,
+            "model_path": "models/intent",
+            "batch_size": 10,
+            "timeout": 5.0
+        },
+        "dialogue_context": {
+            "max_context_size": 10,
+            "max_history_size": 100,
+            "context_ttl": 3600,
+            "sentiment_tracking": true,
+            "topic_tracking": true,
+            "language_tracking": true,
+            "cache_size": 1000,
+            "cache_ttl": 3600
+        },
+        "knowledge_base": {
+            "redis_host": "localhost",
+            "redis_port": 6379,
+            "redis_db": 0,
+            "sqlite_path": "data/knowledge.db",
+            "cache_size": 10000,
+            "cache_ttl": 3600,
+            "max_connections": 10,
+            "batch_size": 100,
+            "cleanup_interval": 86400
+        },
+        "task_executor": {
+            "max_concurrent_tasks": 10,
+            "task_timeout": 300,
+            "retry_attempts": 3,
+            "retry_delay": 5,
+            "priority_levels": 5,
+            "cache_size": 1000,
+            "cache_ttl": 3600,
+            "max_queue_size": 1000,
+            "cleanup_interval": 3600
+        },
+        "external_services": {
+            "max_connections": 20,
+            "connection_timeout": 30,
+            "request_timeout": 10,
+            "max_retries": 3,
+            "retry_delay": 1,
+            "rate_limit": 100,
+            "cache_size": 1000,
+            "cache_ttl": 3600,
+            "health_check_interval": 300,
+            "services": {
+                "openai": {
+                    "api_key": "${OPENAI_API_KEY}",
+                    "model": "gpt-4",
+                    "max_tokens": 2000,
+                    "temperature": 0.7
+                },
+                "google": {
+                    "client_id": "${GOOGLE_CLIENT_ID}",
+                    "client_secret": "${GOOGLE_CLIENT_SECRET}",
+                    "redirect_uri": "${GOOGLE_REDIRECT_URI}",
+                    "scopes": [
+                        "https://www.googleapis.com/auth/calendar",
+                        "https://www.googleapis.com/auth/drive"
+                    ]
+                },
+                "discord": {
+                    "token": "${DISCORD_TOKEN}",
+                    "command_prefix": "!atena",
+                    "activity_status": "online"
+                }
+            }
+        }
+    },
+    "security": {
+        "encryption_key": "${ENCRYPTION_KEY}",
+        "jwt_secret": "${JWT_SECRET}",
+        "jwt_expiry": 3600,
+        "rate_limit": {
+            "requests_per_minute": 60,
+            "burst_size": 10
+        },
+        "allowed_origins": [
+            "http://localhost:3000",
+            "https://yourdomain.com"
+        ],
+        "ssl": {
+            "enabled": true,
+            "cert_path": "certs/cert.pem",
+            "key_path": "certs/key.pem"
+        }
+    },
+    "monitoring": {
+        "metrics_port": 9090,
+        "health_check_interval": 60,
+        "alert_thresholds": {
+            "cpu_percent": 80,
+            "memory_percent": 80,
+            "disk_percent": 80,
+            "error_rate": 0.1
+        },
+        "alert_channels": {
+            "email": {
+                "enabled": true,
+                "recipients": [
+                    "admin@yourdomain.com"
+                ],
+                "smtp_server": "smtp.yourdomain.com",
+                "smtp_port": 587,
+                "smtp_username": "${SMTP_USERNAME}",
+                "smtp_password": "${SMTP_PASSWORD}"
+            },
+            "slack": {
+                "enabled": true,
+                "webhook_url": "${SLACK_WEBHOOK_URL}",
+                "channel": "#alerts"
+            }
+        }
+    },
+    "backup": {
+        "enabled": true,
+        "schedule": "0 0 * * *",
+        "retention_days": 7,
+        "backup_path": "backups",
+        "compress": true,
+        "encrypt": true,
+        "encryption_key": "${BACKUP_ENCRYPTION_KEY}"
+    },
+    "development": {
+        "hot_reload": true,
+        "debug_toolbar": true,
+        "profiling": false,
+        "test_mode": false,
+        "mock_external_services": false
+    }
+}

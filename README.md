@@ -46,14 +46,200 @@ cp .env.example .env
 # Edit .env with your configuration
 ```
 
-## Usage
+## How to Use
 
-1. Start the application:
-```bash
-python src/main.py
+### 1. Basic Setup
+
+First, initialize the system with your configuration:
+
+```python
+from src.main import ATENAAI
+from src.logging.logger import Logger
+
+# Initialize logger
+logger = Logger()
+
+# Create ATENAAI instance
+atenai = ATENAAI(logger)
+
+# Start the system
+await atenai.start()
 ```
 
-2. The system will initialize all components and start listening for input.
+### 2. Task Management
+
+#### Creating Tasks
+```python
+from src.executor.task_executor import TaskExecutor
+
+# Create a task
+task = await task_executor.create_task(
+    title="Process Data",
+    description="Process and analyze the dataset",
+    priority="HIGH",
+    deadline="2024-03-20"
+)
+
+# Add subtasks
+subtask = await task_executor.add_subtask(
+    parent_task_id=task.id,
+    title="Data Cleaning",
+    description="Clean and preprocess the data"
+)
+```
+
+#### Managing Tasks
+```python
+# Update task status
+await task_executor.update_status(task.id, "IN_PROGRESS")
+
+# Add task notes
+await task_executor.add_note(task.id, "Data validation completed")
+
+# Set task priority
+await task_executor.set_priority(task.id, "HIGH")
+```
+
+### 3. Natural Language Interaction
+
+#### Text Input
+```python
+from src.input_processor import InputProcessor
+
+# Process text input
+response = await input_processor.process_text(
+    "Schedule a meeting with John tomorrow at 2 PM"
+)
+```
+
+#### Voice Input
+```python
+# Process voice input
+response = await input_processor.process_voice(
+    audio_file="meeting_request.wav"
+)
+```
+
+### 4. Knowledge Base Operations
+
+```python
+from src.knowledge.knowledge_base import KnowledgeBase
+
+# Store information
+await knowledge_base.store(
+    key="user_preferences",
+    value={"theme": "dark", "language": "en"}
+)
+
+# Retrieve information
+preferences = await knowledge_base.retrieve("user_preferences")
+
+# Update information
+await knowledge_base.update(
+    key="user_preferences",
+    value={"theme": "light"}
+)
+```
+
+### 5. External Service Integration
+
+```python
+from src.services.external_services import ExternalServices
+
+# Register external service
+external_services.register_service(
+    name="email_service",
+    service_type="EMAIL",
+    config={
+        "smtp_server": "smtp.example.com",
+        "port": 587
+    }
+)
+
+# Use external service
+await external_services.send_email(
+    to="user@example.com",
+    subject="Task Update",
+    body="Your task has been completed"
+)
+```
+
+### 6. Error Handling
+
+```python
+from src.utils.error_handler import ErrorHandler, ErrorSeverity, ErrorCategory
+
+# Handle errors with retry mechanism
+try:
+    result = await some_operation()
+except Exception as e:
+    await error_handler.handle_error(
+        error=e,
+        component="my_component",
+        operation="some_operation",
+        severity=ErrorSeverity.MEDIUM,
+        category=ErrorCategory.SYSTEM,
+        retry=True
+    )
+```
+
+### 7. Monitoring and Logging
+
+```python
+# Get system metrics
+metrics = await meta_agent.get_metrics()
+
+# Check system health
+health_status = await meta_agent.check_health()
+
+# Get performance statistics
+performance_stats = await meta_agent.get_performance_stats()
+```
+
+### 8. Configuration
+
+The system can be configured through environment variables:
+
+```env
+# Core Settings
+DEBUG=false
+LOG_LEVEL=INFO
+ENVIRONMENT=development
+
+# API Keys
+OPENAI_API_KEY=your_openai_api_key
+DISCORD_BOT_TOKEN=your_discord_bot_token
+
+# Service Configuration
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# Error Handling
+MAX_RETRY_ATTEMPTS=3
+CIRCUIT_BREAKER_THRESHOLD=5
+```
+
+### 9. Best Practices
+
+1. **Error Handling**
+   - Always use appropriate error severity levels
+   - Implement retry mechanisms for transient failures
+   - Use circuit breakers for external services
+
+2. **Task Management**
+   - Break down complex tasks into subtasks
+   - Set realistic deadlines
+   - Use appropriate priority levels
+
+3. **Resource Management**
+   - Clean up resources after use
+   - Monitor system performance
+   - Implement proper logging
+
+4. **Security**
+   - Never commit sensitive information
+   - Use environment variables for secrets
+   - Implement proper authentication
 
 ## Project Structure
 

@@ -50,7 +50,7 @@ class SelfImprovement:
         self.config = config
         self.meta_agent = meta_agent
         self.optimization_history: List[OptimizationResult] = []
-        self.improvement_interval = 3600  # 1 hour
+        self.improvement_interval = 300  # 5 minutes
         self.min_improvement_threshold = 0.05  # 5% improvement required
         
         # Module-specific optimization configs
@@ -187,17 +187,16 @@ class SelfImprovement:
         if not actions:
             return OptimizationType.PARAMETER_TUNING
 
-        # Count action types
-        action_types = [action.action_type for action in actions]
-        emergency_count = action_types.count('emergency_optimization')
-        model_update_count = action_types.count('update_decision_weights')
-        
-        if emergency_count > 0:
+        # Check for emergency optimizations first
+        if any(action.action_type == 'emergency_optimization' for action in actions):
             return OptimizationType.PARAMETER_TUNING
-        elif model_update_count > 0:
+
+        # Check for model updates
+        if any(action.action_type == 'update_decision_weights' for action in actions):
             return OptimizationType.MODEL_UPDATE
-        else:
-            return OptimizationType.PARAMETER_TUNING
+
+        # Default to parameter tuning
+        return OptimizationType.PARAMETER_TUNING
     
     async def _generate_optimization(
         self,
@@ -206,45 +205,37 @@ class SelfImprovement:
         actions: List[ImprovementAction],
         current_performance: Dict[str, float]
     ) -> Dict[str, Any]:
-        """Generate optimization parameters based on current performance and history."""
-        if optimization_type == OptimizationType.PARAMETER_TUNING:
-            # Get current config for the module
-            module_prefix = f"{target_module}_"
-            current_params = {
-                k.replace(module_prefix, ''): v
-                for k, v in self.config.items()
-                if k.startswith(module_prefix)
-            }
-            
-            # Generate new parameters based on performance
-            new_params = {}
-            rollback_data = {}
-            
-            for param, value in current_params.items():
-                if isinstance(value, (int, float)):
-                    if 'timeout' in param or 'interval' in param:
-                        # Adjust timeouts based on latency
-                        if current_performance.get('api_latency', 0) > self.meta_agent.thresholds['api_latency']:
-                            new_params[param] = value * 0.5  # Reduce timeout
-                        rollback_data[param] = value
-                    elif 'threshold' in param:
-                        # Adjust thresholds based on accuracy metrics
-                        if any(v < self.meta_agent.thresholds[k] for k, v in current_performance.items() if 'accuracy' in k or 'quality' in k):
-                            new_params[param] = value * 0.9  # Reduce threshold
-                        rollback_data[param] = value
-            
-            return {
-                'type': optimization_type,
-                'module': target_module,
-                'parameters': new_params,
-                'rollback_data': rollback_data
-            }
-        
+        """Generate optimization parameters based on the current state."""
+        parameters = {}
+        rollback_data = {}
+
+        if target_module == 'business_intelligence':
+            if optimization_type == OptimizationType.PARAMETER_TUNING:
+                # Adjust cache timeout based on performance
+                current_timeout = self.config['business_intelligence_cache_timeout']
+                new_timeout = current_timeout // 2 if current_performance.get('research_accuracy', 1.0) < 0.7 else current_timeout * 2
+                parameters['cache_timeout'] = new_timeout
+                rollback_data['cache_timeout'] = current_timeout
+
+                # Adjust alert priority
+                current_priority = self.config['business_intelligence_min_alert_priority']
+                new_priority = max(1, current_priority - 1) if current_performance.get('alert_relevance', 1.0) < 0.7 else min(5, current_priority + 1)
+                parameters['min_alert_priority'] = new_priority
+                rollback_data['min_alert_priority'] = current_priority
+
+        elif target_module == 'api_client':
+            if optimization_type == OptimizationType.PARAMETER_TUNING:
+                # Adjust request timeout
+                current_timeout = self.config['api_client_request_timeout']
+                new_timeout = current_timeout - 2 if current_performance.get('api_latency', 0) > 2.0 else current_timeout + 2
+                parameters['request_timeout'] = max(1, new_timeout)
+                rollback_data['request_timeout'] = current_timeout
+
         return {
             'type': optimization_type,
             'module': target_module,
-            'parameters': {},
-            'rollback_data': {}
+            'parameters': parameters,
+            'rollback_data': rollback_data
         }
     
     async def _apply_optimization(
@@ -298,44 +289,46 @@ class SelfImprovement:
         baseline_performance: Dict[str, float]
     ) -> Dict[str, float]:
         """Monitor the impact of an optimization on performance metrics."""
-        # Get recent metrics for the module
         impact = {}
-        for metric_type, snapshots in self.meta_agent.performance_history.items():
-            if not snapshots:
+        
+        # Get recent metrics for the module
+        for metric_type, metrics in self.meta_agent.performance_history.items():
+            if not metrics:
                 continue
-            
-            # Get metrics after optimization
-            post_opt_metrics = [
-                s.value for s in snapshots
-                if s.source_module == module and s.timestamp > optimization.timestamp
+                
+            recent_metrics = [
+                m for m in metrics
+                if m.source_module == module and
+                m.timestamp > optimization.timestamp
             ]
             
-            if post_opt_metrics:
-                # Calculate improvement
-                current_value = np.mean(post_opt_metrics)
-                baseline = baseline_performance.get(metric_type.value, 0)
+            if recent_metrics:
+                current_value = np.mean([m.value for m in recent_metrics])
+                metric_name = metric_type.value
+                baseline = baseline_performance.get(metric_name, 0)
                 
-                if metric_type == PerformanceMetric.API_LATENCY:
-                    # For latency, improvement is reduction
-                    impact[metric_type.value] = (baseline - current_value) / baseline
+                if metric_name == 'api_latency':
+                    # For latency, improvement is a decrease
+                    impact[metric_name] = (baseline - current_value) / baseline if baseline > 0 else 0
                 else:
-                    # For other metrics, improvement is increase
-                    impact[metric_type.value] = (current_value - baseline) / baseline
+                    # For other metrics, improvement is an increase
+                    impact[metric_name] = (current_value - baseline) / baseline if baseline > 0 else 0
         
         return impact
     
     def _should_rollback(self, impact: Dict[str, float]) -> bool:
-        """Determine if an optimization should be rolled back based on its impact."""
+        """Determine if an optimization should be rolled back."""
         if not impact:
             return True
-        
-        # Check if any metric got significantly worse
-        if any(imp < -0.1 for imp in impact.values()):  # 10% degradation
-            return True
-        
-        # Check if improvement is insufficient
+
+        # Calculate average improvement
         avg_improvement = np.mean(list(impact.values()))
-        return avg_improvement < self.min_improvement_threshold
+        
+        # Rollback if:
+        # 1. Average improvement is below threshold
+        # 2. Any metric got significantly worse (>10% degradation)
+        return (avg_improvement < self.min_improvement_threshold or
+                any(imp < -0.1 for imp in impact.values()))
     
     async def _rollback_optimization(self, optimization: OptimizationResult) -> None:
         """Roll back an optimization to its previous state."""

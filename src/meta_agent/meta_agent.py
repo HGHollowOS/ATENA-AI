@@ -12,7 +12,7 @@ import asyncio
 from dataclasses import dataclass
 from enum import Enum
 import numpy as np
-from collections import deque
+from collections import deque, defaultdict
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +59,7 @@ class MetaAgent:
     def __init__(self, config: Dict[str, Any]):
         """Initialize the Meta-Agent."""
         self.config = config
-        self.performance_history: Dict[PerformanceMetric, List[MetricSnapshot]] = {
-            metric: [] for metric in PerformanceMetric
-        }
+        self.performance_history = defaultdict(list)
         self.decision_history: List[DecisionOutcome] = []
         self.improvement_queue: List[ImprovementAction] = []
         self.thresholds = config['thresholds']
@@ -79,23 +77,19 @@ class MetaAgent:
                 await asyncio.sleep(60)
     
     def record_metric(self, snapshot: MetricSnapshot) -> None:
-        """Record a performance metric and trigger immediate action if needed."""
+        """Record a performance metric and check for immediate action if needed."""
         self.performance_history[snapshot.metric_type].append(snapshot)
         
         # Check if metric is significantly worse than threshold
         threshold = self.thresholds[snapshot.metric_type.value]
-        if (snapshot.metric_type in [PerformanceMetric.API_LATENCY] and snapshot.value > threshold * 1.5) or \
-           (snapshot.metric_type not in [PerformanceMetric.API_LATENCY] and snapshot.value < threshold * 0.8):
-            # Create emergency improvement action
-            action = ImprovementAction(
-                action_type='emergency_optimization',
-                target_module=snapshot.source_module,
-                parameters={'metric': snapshot.metric_type.value, 'value': snapshot.value},
-                reason=f'Emergency optimization needed due to poor {snapshot.metric_type.value}',
-                priority=5,  # Highest priority
-                timestamp=datetime.now()
-            )
-            self.improvement_queue.append(action)
+        if snapshot.metric_type in [PerformanceMetric.API_LATENCY]:
+            # For latency, higher is worse
+            if snapshot.value > threshold * 1.5:  # 50% worse than threshold
+                self._create_emergency_action(snapshot)
+        else:
+            # For accuracy/quality metrics, lower is worse
+            if snapshot.value < threshold * 0.7:  # 30% worse than threshold
+                self._create_emergency_action(snapshot)
     
     def record_decision(self, decision: DecisionOutcome) -> None:
         """Record a decision outcome for analysis."""
@@ -103,39 +97,61 @@ class MetaAgent:
     
     async def _analyze_performance(self) -> None:
         """Analyze performance metrics and create improvement actions."""
-        for metric_type, snapshots in self.performance_history.items():
-            if not snapshots:
+        current_time = datetime.now()
+        
+        # Analyze each metric type
+        for metric_type in PerformanceMetric:
+            metrics = self.performance_history[metric_type]
+            if not metrics:
                 continue
-
-            recent_snapshots = sorted(snapshots, key=lambda x: x.timestamp, reverse=True)[:10]
-            values = [s.value for s in recent_snapshots]
-            trend = self._calculate_trend(values)
+                
+            # Get recent metrics
+            recent_metrics = [m for m in metrics 
+                            if (current_time - m.timestamp).total_seconds() < self.analysis_interval]
             
+            if not recent_metrics:
+                continue
+                
+            # Calculate average performance
+            avg_value = np.mean([m.value for m in recent_metrics])
             threshold = self.thresholds[metric_type.value]
-            avg_value = np.mean(values)
             
-            # Check if performance is consistently below threshold
-            if ((metric_type == PerformanceMetric.API_LATENCY and avg_value > threshold) or
-                (metric_type != PerformanceMetric.API_LATENCY and avg_value < threshold)):
+            # Check if performance is below threshold
+            if ((metric_type in [PerformanceMetric.API_LATENCY] and avg_value > threshold) or
+                (metric_type not in [PerformanceMetric.API_LATENCY] and avg_value < threshold)):
                 
                 # Create improvement action
                 action = ImprovementAction(
                     action_type='optimize_performance',
-                    target_module=recent_snapshots[0].source_module,
-                    parameters={
-                        'metric': metric_type.value,
-                        'current_value': avg_value,
-                        'trend': trend
-                    },
-                    reason=f'Performance optimization needed for {metric_type.value}',
-                    priority=3 if trend < 0 else 2,  # Higher priority if getting worse
-                    timestamp=datetime.now()
+                    target_module=recent_metrics[0].source_module,
+                    parameters={'metric': metric_type.value, 'current_value': avg_value},
+                    reason=f'Sustained poor performance in {metric_type.value}',
+                    priority=3,  # Medium priority
+                    timestamp=current_time
                 )
                 self.improvement_queue.append(action)
     
+    def _create_emergency_action(self, snapshot: MetricSnapshot) -> None:
+        """Create an emergency improvement action for critical performance issues."""
+        action = ImprovementAction(
+            action_type='emergency_optimization',
+            target_module=snapshot.source_module,
+            parameters={'metric': snapshot.metric_type.value, 'value': snapshot.value},
+            reason=f'Critical performance degradation in {snapshot.metric_type.value}',
+            priority=5,  # Highest priority
+            timestamp=datetime.now()
+        )
+        self.improvement_queue.append(action)
+    
+    async def get_pending_improvements(self) -> List[ImprovementAction]:
+        """Get and clear the queue of pending improvements."""
+        improvements = sorted(self.improvement_queue, key=lambda x: (-x.priority, x.timestamp))
+        self.improvement_queue = []
+        return improvements
+    
     def _calculate_trend(self, values: List[float]) -> float:
-        """Calculate the trend of a series of values."""
-        if len(values) < 2:
+        """Calculate the trend in a series of values."""
+        if not values or len(values) < 2:
             return 0.0
         x = np.arange(len(values))
         y = np.array(values)
@@ -146,9 +162,9 @@ class MetaAgent:
         """Extract common factors from a list of contexts."""
         if not contexts:
             return {}
-
+            
         result = {}
-        # Get all keys from the first context
+        # Get all keys from first context
         keys = set(contexts[0].keys())
         
         for key in keys:
@@ -164,16 +180,7 @@ class MetaAgent:
                 result[key] = {
                     'min': min(values),
                     'max': max(values),
-                    'mean': sum(values) / len(values)
+                    'mean': np.mean(values)
                 }
-            
-        return result
-    
-    async def get_pending_improvements(self) -> List[ImprovementAction]:
-        """Get and clear the improvement queue, sorted by priority."""
-        improvements = sorted(
-            self.improvement_queue,
-            key=lambda x: (-x.priority, x.timestamp)  # Sort by priority (desc) and timestamp (asc)
-        )
-        self.improvement_queue = []  # Clear the queue
-        return improvements 
+                
+        return result 

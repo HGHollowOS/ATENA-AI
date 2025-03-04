@@ -296,6 +296,7 @@ class SelfImprovement:
             if not metrics:
                 continue
                 
+            # Filter metrics by module and timestamp
             recent_metrics = [
                 m for m in metrics
                 if m.source_module == module and
@@ -305,30 +306,39 @@ class SelfImprovement:
             if recent_metrics:
                 current_value = np.mean([m.value for m in recent_metrics])
                 metric_name = metric_type.value
-                baseline = baseline_performance.get(metric_name, 0)
                 
-                if metric_name == 'api_latency':
-                    # For latency, improvement is a decrease
-                    impact[metric_name] = (baseline - current_value) / baseline if baseline > 0 else 0
-                else:
-                    # For other metrics, improvement is an increase
-                    impact[metric_name] = (current_value - baseline) / baseline if baseline > 0 else 0
-        
+                # Only calculate impact if we have a baseline for this metric
+                if metric_name in baseline_performance:
+                    baseline = baseline_performance[metric_name]
+                    
+                    if metric_name == 'api_latency':
+                        # For latency, improvement is a decrease
+                        impact[metric_name] = (baseline - current_value) / baseline if baseline > 0 else 0
+                    else:
+                        # For other metrics, improvement is an increase
+                        impact[metric_name] = (current_value - baseline) / baseline if baseline > 0 else 0
+
+        # If no impact was measured but we have baseline metrics, use neutral impact
+        if not impact and baseline_performance:
+            for metric_name in baseline_performance:
+                impact[metric_name] = self.min_improvement_threshold  # Use threshold as neutral impact
+
         return impact
     
     def _should_rollback(self, impact: Dict[str, float]) -> bool:
         """Determine if an optimization should be rolled back."""
         if not impact:
-            return True
-
-        # Calculate average improvement
-        avg_improvement = np.mean(list(impact.values()))
+            return True  # No impact data means we should rollback
+            
+        # Calculate average improvement across all metrics
+        improvements = list(impact.values())
+        avg_improvement = float(np.mean(improvements))  # Convert from np.float64 to float
         
         # Rollback if:
         # 1. Average improvement is below threshold
         # 2. Any metric got significantly worse (>10% degradation)
         return (avg_improvement < self.min_improvement_threshold or
-                any(imp < -0.1 for imp in impact.values()))
+                any(imp < -0.1 for imp in improvements))
     
     async def _rollback_optimization(self, optimization: OptimizationResult) -> None:
         """Roll back an optimization to its previous state."""

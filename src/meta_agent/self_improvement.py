@@ -36,7 +36,7 @@ class OptimizationResult:
     """Data structure for optimization results."""
     optimization_type: OptimizationType
     target_module: str
-    changes_made: Dict[str, Any]
+    changes_made: Dict[str, Dict[str, Any]]
     performance_impact: Dict[str, float]
     timestamp: datetime
     success: bool
@@ -51,7 +51,6 @@ class SelfImprovement:
         self.meta_agent = meta_agent
         self.optimization_history: List[OptimizationResult] = []
         self.improvement_interval = 3600  # 1 hour
-        self.last_improvement = datetime.now()
         self.min_improvement_threshold = 0.05  # 5% improvement required
         
         # Module-specific optimization configs
@@ -184,140 +183,88 @@ class SelfImprovement:
         self,
         actions: List[ImprovementAction]
     ) -> OptimizationType:
-        """Determine the type of optimization needed."""
-        try:
-            # Count action types
-            action_types = [action.action_type for action in actions]
-            
-            if 'emergency_optimization' in action_types:
-                # For emergency actions, focus on immediate impact
-                return OptimizationType.PARAMETER_TUNING
-            
-            if 'update_decision_weights' in action_types:
-                return OptimizationType.MODEL_UPDATE
-            
-            # Check performance metrics
-            metrics = set()
-            for action in actions:
-                if 'metric' in action.parameters:
-                    metrics.add(action.parameters['metric'])
-            
-            if 'api_latency' in metrics:
-                return OptimizationType.API_OPTIMIZATION
-            
-            if len(actions) >= 3:
-                # Multiple issues might need resource reallocation
-                return OptimizationType.RESOURCE_ALLOCATION
-            
-            # Default to parameter tuning
+        """Determine the type of optimization needed based on improvement actions."""
+        if not actions:
             return OptimizationType.PARAMETER_TUNING
-            
-        except Exception as e:
-            logger.error(f"Error determining optimization type: {e}")
+
+        # Count action types
+        action_types = [action.action_type for action in actions]
+        emergency_count = action_types.count('emergency_optimization')
+        model_update_count = action_types.count('update_decision_weights')
+        
+        if emergency_count > 0:
+            return OptimizationType.PARAMETER_TUNING
+        elif model_update_count > 0:
+            return OptimizationType.MODEL_UPDATE
+        else:
             return OptimizationType.PARAMETER_TUNING
     
     async def _generate_optimization(
         self,
-        module: str,
-        opt_type: OptimizationType,
+        target_module: str,
+        optimization_type: OptimizationType,
         actions: List[ImprovementAction],
         current_performance: Dict[str, float]
-    ) -> Optional[Dict[str, Any]]:
-        """Generate optimization parameters based on type and context."""
-        try:
-            if module not in self.optimization_configs:
-                return None
-            
-            config = self.optimization_configs[module]
-            optimization = {
-                'type': opt_type,
-                'module': module,
-                'parameters': {},
-                'rollback_data': {}
+    ) -> Dict[str, Any]:
+        """Generate optimization parameters based on current performance and history."""
+        if optimization_type == OptimizationType.PARAMETER_TUNING:
+            # Get current config for the module
+            module_prefix = f"{target_module}_"
+            current_params = {
+                k.replace(module_prefix, ''): v
+                for k, v in self.config.items()
+                if k.startswith(module_prefix)
             }
             
-            if opt_type == OptimizationType.PARAMETER_TUNING:
-                # Adjust parameters based on performance
-                for param, (min_val, max_val) in config.items():
-                    current_val = self.config.get(f"{module}_{param}")
-                    if current_val is None:
-                        continue
-                    
-                    # Store current value for rollback
-                    optimization['rollback_data'][param] = current_val
-                    
-                    # Calculate new value
-                    if any(a.priority >= 4 for a in actions):
-                        # Aggressive adjustment for high-priority issues
-                        adjustment = 0.3
-                    else:
-                        adjustment = 0.1
-                    
-                    if param.endswith('timeout'):
-                        # Decrease timeouts for latency issues
-                        new_val = max(
-                            min_val,
-                            current_val * (1 - adjustment)
-                        )
-                    else:
-                        # Increase other parameters
-                        new_val = min(
-                            max_val,
-                            current_val * (1 + adjustment)
-                        )
-                    
-                    optimization['parameters'][param] = new_val
+            # Generate new parameters based on performance
+            new_params = {}
+            rollback_data = {}
             
-            elif opt_type == OptimizationType.CACHE_OPTIMIZATION:
-                # Optimize cache settings
-                optimization['parameters'] = {
-                    'cache_timeout': min(
-                        config['cache_timeout'][1],
-                        self.config.get(f"{module}_cache_timeout", 3600) * 0.8
-                    ),
-                    'cache_size': self.config.get(f"{module}_cache_size", 1000) * 1.2
-                }
+            for param, value in current_params.items():
+                if isinstance(value, (int, float)):
+                    if 'timeout' in param or 'interval' in param:
+                        # Adjust timeouts based on latency
+                        if current_performance.get('api_latency', 0) > self.meta_agent.thresholds['api_latency']:
+                            new_params[param] = value * 0.5  # Reduce timeout
+                        rollback_data[param] = value
+                    elif 'threshold' in param:
+                        # Adjust thresholds based on accuracy metrics
+                        if any(v < self.meta_agent.thresholds[k] for k, v in current_performance.items() if 'accuracy' in k or 'quality' in k):
+                            new_params[param] = value * 0.9  # Reduce threshold
+                        rollback_data[param] = value
             
-            elif opt_type == OptimizationType.API_OPTIMIZATION:
-                # Optimize API-related settings
-                optimization['parameters'] = {
-                    'request_timeout': max(
-                        config['request_timeout'][0],
-                        self.config.get(f"{module}_request_timeout", 10) * 0.8
-                    ),
-                    'retry_attempts': min(
-                        config['retry_attempts'][1],
-                        self.config.get(f"{module}_retry_attempts", 3) + 1
-                    )
-                }
-            
-            return optimization
-            
-        except Exception as e:
-            logger.error(f"Error generating optimization: {e}")
-            return None
+            return {
+                'type': optimization_type,
+                'module': target_module,
+                'parameters': new_params,
+                'rollback_data': rollback_data
+            }
+        
+        return {
+            'type': optimization_type,
+            'module': target_module,
+            'parameters': {},
+            'rollback_data': {}
+        }
     
     async def _apply_optimization(
         self,
         optimization: Dict[str, Any]
     ) -> OptimizationResult:
-        """Apply optimization changes to the system."""
+        """Apply optimization changes and record the result."""
+        module = optimization['module']
+        changes_made = {}
+        
         try:
-            module = optimization['module']
-            changes_made = {}
-            
-            # Apply changes
+            # Apply changes to configuration
             for param, value in optimization['parameters'].items():
-                config_key = f"{module}_{param}"
-                old_value = self.config.get(config_key)
-                self.config[config_key] = value
-                changes_made[param] = {
-                    'old': old_value,
-                    'new': value
-                }
+                param_key = f"{module}_{param}"
+                old_value = self.config.get(param_key)
+                self.config[param_key] = value
+                changes_made[param] = {'old': old_value, 'new': value}
             
             result = OptimizationResult(
-                optimization_type=OptimizationType(optimization['type']),
+                optimization_type=optimization['type'],
                 target_module=module,
                 changes_made=changes_made,
                 performance_impact={},
@@ -326,17 +273,17 @@ class SelfImprovement:
                 rollback_data=optimization['rollback_data']
             )
             
-            logger.info(
-                f"Applied optimization to {module}: "
-                f"type={optimization['type']}, changes={changes_made}"
-            )
-            
+            self.optimization_history.append(result)
             return result
             
         except Exception as e:
-            logger.error(f"Error applying optimization: {e}")
+            # Revert any changes made
+            for param, values in changes_made.items():
+                param_key = f"{module}_{param}"
+                self.config[param_key] = values['old']
+            
             return OptimizationResult(
-                optimization_type=OptimizationType(optimization['type']),
+                optimization_type=optimization['type'],
                 target_module=module,
                 changes_made={},
                 performance_impact={},
@@ -350,69 +297,55 @@ class SelfImprovement:
         optimization: OptimizationResult,
         baseline_performance: Dict[str, float]
     ) -> Dict[str, float]:
-        """Monitor the impact of applied optimization."""
-        try:
-            # Wait for some time to observe impact
-            await asyncio.sleep(300)  # 5 minutes
+        """Monitor the impact of an optimization on performance metrics."""
+        # Get recent metrics for the module
+        impact = {}
+        for metric_type, snapshots in self.meta_agent.performance_history.items():
+            if not snapshots:
+                continue
             
-            # Get current performance
-            current_performance = self._get_module_performance(module)
+            # Get metrics after optimization
+            post_opt_metrics = [
+                s.value for s in snapshots
+                if s.source_module == module and s.timestamp > optimization.timestamp
+            ]
             
-            # Calculate impact
-            impact = {}
-            for metric, current_value in current_performance.items():
-                if metric in baseline_performance:
-                    baseline = baseline_performance[metric]
-                    if baseline > 0:
-                        impact[metric] = (current_value - baseline) / baseline
-                    else:
-                        impact[metric] = 0.0
-            
-            # Update optimization result
-            optimization.performance_impact = impact
-            
-            return impact
-            
-        except Exception as e:
-            logger.error(f"Error monitoring optimization impact: {e}")
-            return {}
+            if post_opt_metrics:
+                # Calculate improvement
+                current_value = np.mean(post_opt_metrics)
+                baseline = baseline_performance.get(metric_type.value, 0)
+                
+                if metric_type == PerformanceMetric.API_LATENCY:
+                    # For latency, improvement is reduction
+                    impact[metric_type.value] = (baseline - current_value) / baseline
+                else:
+                    # For other metrics, improvement is increase
+                    impact[metric_type.value] = (current_value - baseline) / baseline
+        
+        return impact
     
     def _should_rollback(self, impact: Dict[str, float]) -> bool:
-        """Determine if optimization should be rolled back."""
-        try:
-            if not impact:
-                return True
-            
-            # Calculate average impact
-            avg_impact = sum(impact.values()) / len(impact)
-            
-            # Rollback if average impact is negative
-            # or improvement is below threshold
-            return avg_impact < 0 or avg_impact < self.min_improvement_threshold
-            
-        except Exception as e:
-            logger.error(f"Error checking rollback condition: {e}")
+        """Determine if an optimization should be rolled back based on its impact."""
+        if not impact:
             return True
+        
+        # Check if any metric got significantly worse
+        if any(imp < -0.1 for imp in impact.values()):  # 10% degradation
+            return True
+        
+        # Check if improvement is insufficient
+        avg_improvement = np.mean(list(impact.values()))
+        return avg_improvement < self.min_improvement_threshold
     
-    async def _rollback_optimization(self, optimization: OptimizationResult):
-        """Rollback optimization changes."""
-        try:
-            if not optimization.rollback_data:
-                return
-            
-            module = optimization.target_module
-            
-            # Restore previous values
-            for param, value in optimization.rollback_data.items():
-                config_key = f"{module}_{param}"
-                self.config[config_key] = value
-            
-            logger.info(
-                f"Rolled back optimization for {module} due to insufficient improvement"
-            )
-            
-        except Exception as e:
-            logger.error(f"Error rolling back optimization: {e}")
+    async def _rollback_optimization(self, optimization: OptimizationResult) -> None:
+        """Roll back an optimization to its previous state."""
+        if not optimization.rollback_data:
+            return
+        
+        module = optimization.target_module
+        for param, value in optimization.rollback_data.items():
+            param_key = f"{module}_{param}"
+            self.config[param_key] = value
     
     def get_optimization_history(
         self,

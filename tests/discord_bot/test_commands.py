@@ -29,7 +29,7 @@ class MockBusinessIntelligence:
     
     async def setup_monitor(self, target: str, metric: str, threshold: float) -> dict:
         return {
-            'id': '123',
+            'id': 'mon_123',
             'target': target,
             'metric': metric,
             'threshold': threshold,
@@ -81,6 +81,11 @@ class MockMessage:
     async def edit(self, embed=None):
         pass
 
+class MockContext:
+    """Mock Discord context for testing."""
+    async def send(self, content=None, embed=None):
+        pass
+
 @pytest.fixture
 def bot():
     """Create a mock bot instance."""
@@ -96,56 +101,96 @@ def interaction():
     """Create a mock interaction."""
     return MockInteraction()
 
+@pytest.fixture
+def ctx():
+    """Create a mock context."""
+    return MockContext()
+
 @pytest.mark.asyncio
-async def test_research_command(cog, interaction):
-    """Test the research command."""
-    # Test with default depth
-    await cog.research(interaction, topic="AI Technology")
+async def test_help_command(cog, ctx):
+    """Test the help command."""
+    await cog.help_command(ctx)
+
+@pytest.mark.asyncio
+async def test_research_command_validation(cog, interaction):
+    """Test research command input validation."""
+    # Test with invalid topic (too short)
+    await cog.research(interaction, topic="a")
     
-    # Test with specified depth
-    await cog.research(interaction, topic="Cloud Computing", depth="deep")
-
-@pytest.mark.asyncio
-async def test_monitor_command(cog, interaction):
-    """Test the monitor command."""
-    await cog.monitor(
-        interaction,
-        target="Market Share",
-        metric="percentage",
-        threshold=75.0
-    )
-
-@pytest.mark.asyncio
-async def test_analyze_command(cog, interaction):
-    """Test the analyze command."""
-    # Test with default timeframe
-    await cog.analyze(interaction, metric="Revenue")
+    # Test with invalid depth
+    await cog.research(interaction, topic="AI Technology", depth="invalid")
     
-    # Test with specified timeframe
-    await cog.analyze(interaction, metric="Profit Margin", timeframe="1w")
+    # Test with valid inputs
+    await cog.research(interaction, topic="AI Technology", depth="deep")
 
 @pytest.mark.asyncio
-async def test_report_command(cog, interaction):
-    """Test the report command."""
-    # Test with default timeframe
-    await cog.report(interaction, report_type="Performance")
+async def test_monitor_command_validation(cog, interaction):
+    """Test monitor command input validation."""
+    # Test with invalid target (too short)
+    await cog.monitor(interaction, target="a", metric="test", threshold=75.0)
     
-    # Test with specified timeframe
-    await cog.report(
-        interaction,
-        report_type="Market Analysis",
-        timeframe="1m"
-    )
+    # Test with invalid metric (too short)
+    await cog.monitor(interaction, target="Market Share", metric="", threshold=75.0)
+    
+    # Test with invalid threshold
+    await cog.monitor(interaction, target="Market Share", metric="percentage", threshold=-1.0)
+    
+    # Test with valid inputs
+    await cog.monitor(interaction, target="Market Share", metric="percentage", threshold=75.0)
 
 @pytest.mark.asyncio
-async def test_error_handling(cog, interaction):
+async def test_analyze_command_validation(cog, interaction):
+    """Test analyze command input validation."""
+    # Test with invalid metric (too short)
+    await cog.analyze(interaction, metric="")
+    
+    # Test with invalid timeframe
+    await cog.analyze(interaction, metric="Revenue", timeframe="invalid")
+    
+    # Test with valid inputs
+    await cog.analyze(interaction, metric="Revenue", timeframe="1w")
+
+@pytest.mark.asyncio
+async def test_report_command_validation(cog, interaction):
+    """Test report command input validation."""
+    # Test with invalid report type
+    await cog.report(interaction, report_type="invalid")
+    
+    # Test with invalid timeframe
+    await cog.report(interaction, report_type="performance", timeframe="invalid")
+    
+    # Test with valid inputs
+    await cog.report(interaction, report_type="performance", timeframe="1w")
+
+@pytest.mark.asyncio
+async def test_error_handling(cog, interaction, ctx):
     """Test error handling in commands."""
-    # Mock business intelligence to raise an exception
+    # Test command not found error
+    error = commands.CommandNotFound()
+    await cog.on_command_error(ctx, error)
+    
+    # Test general error
+    error = Exception("Test error")
+    await cog.on_command_error(ctx, error)
+    
+    # Test business intelligence error
     class ErrorBusinessIntelligence:
         async def research(self, *args, **kwargs):
             raise Exception("Test error")
     
     cog.bot.business_intelligence = ErrorBusinessIntelligence()
+    await cog.research(interaction, topic="Test")
+
+@pytest.mark.asyncio
+async def test_command_metadata(cog):
+    """Test command metadata and descriptions."""
+    assert cog.research.name == "research"
+    assert cog.monitor.name == "monitor"
+    assert cog.analyze.name == "analyze"
+    assert cog.report.name == "report"
     
-    # Test error handling in research command
-    await cog.research(interaction, topic="Test") 
+    # Verify command descriptions
+    assert "Research a company or industry" in cog.research.description
+    assert "Set up business monitoring alerts" in cog.monitor.description
+    assert "Analyze business performance metrics" in cog.analyze.description
+    assert "Generate a business intelligence report" in cog.report.description 

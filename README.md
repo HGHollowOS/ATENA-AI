@@ -1,45 +1,56 @@
-# ATENA-AI - Proactive Business Assistant on Discord
+# ATENA-AI
 
-ATENA-AI is an intelligent business assistant that operates proactively on Discord, supporting your company's tasks through natural conversation and autonomous research capabilities. It combines advanced AI with business intelligence to provide real-time insights and automate routine tasks.
+ATENA-AI is an advanced AI-powered Discord bot designed to support company tasks through natural conversation and autonomous business intelligence capabilities. It combines proactive monitoring, natural language processing, and self-improvement systems to provide valuable insights and automate business workflows.
 
 ## Features
 
 ### Core Capabilities
-- 🤖 Proactive Business Intelligence
-- 💬 Natural Discord Interaction
-- 🔄 Self-Improvement System
-- 🔗 Business Workflow Automation
+- **Proactive Business Intelligence**: Monitors market trends, company performance, and industry developments in real-time
+- **Natural Discord Interaction**: Responds to both slash commands and natural language queries
+- **Self-Improvement System**: Continuously learns and adapts based on interactions and performance metrics
+- **Business Workflow Automation**: Streamlines common business tasks and research processes
 
-### Business Commands
-ATENA-AI provides several powerful commands for business operations:
+### Command Reference
 
-#### Research Command
-Research companies or industries with varying levels of depth:
-```bash
-/research topic:"Tesla" depth:"deep"
-/research topic:"AI Industry" depth:"quick"
-```
+#### Slash Commands
+- `/research [topic] [depth]`
+  - Conducts in-depth research on companies or industries
+  - **Parameters**:
+    - `topic`: Company name or industry (min. 3 characters)
+    - `depth`: Research depth ("quick", "normal", "deep")
+  - **Example**: `/research topic:"Tesla" depth:"deep"`
 
-#### Monitor Command
-Set up monitoring alerts for business metrics:
-```bash
-/monitor target:"Market Share" metric:"percentage" threshold:75.0
-/monitor target:"Revenue" metric:"growth_rate" threshold:10.0
-```
+- `/monitor [target] [metric] [threshold]`
+  - Sets up monitoring for business metrics
+  - **Parameters**:
+    - `target`: Metric to monitor (e.g., "Market Share", "Revenue")
+    - `metric`: Type of measurement ("percentage", "value", "growth_rate")
+    - `threshold`: Alert threshold value
+  - **Example**: `/monitor target:"Revenue" metric:"growth_rate" threshold:10.0`
 
-#### Analyze Command
-Analyze business performance metrics over different timeframes:
-```bash
-/analyze metric:"Profit Margin" timeframe:"1w"
-/analyze metric:"Customer Acquisition" timeframe:"1m"
-```
+- `/analyze [metric] [timeframe]`
+  - Analyzes business performance metrics
+  - **Parameters**:
+    - `metric`: Metric to analyze
+    - `timeframe`: Analysis period ("1d", "1w", "1m", "3m", "1y")
+  - **Example**: `/analyze metric:"Profit Margin" timeframe:"1m"`
 
-#### Report Command
-Generate comprehensive business reports:
-```bash
-/report report_type:"Performance" timeframe:"1w"
-/report report_type:"Market Analysis" timeframe:"1m"
-```
+- `/report [report_type] [timeframe]`
+  - Generates business intelligence reports
+  - **Parameters**:
+    - `report_type`: Type of report ("performance", "market", "competitor", "trend")
+    - `timeframe`: Report period ("1w", "1m", "3m", "1y")
+  - **Example**: `/report report_type:"market" timeframe:"1m"`
+
+#### Text Commands
+- `!atena help`
+  - Displays comprehensive help information
+  - Lists all available commands and their usage
+
+- Natural Language Queries
+  - Example: "How is Tesla performing this quarter?"
+  - Example: "Monitor SpaceX's market share"
+  - Example: "Generate a competitor analysis report"
 
 ## Installation
 
@@ -56,16 +67,9 @@ pip install -r requirements.txt
 
 3. Set up environment variables:
 ```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-Required environment variables:
-```env
-DISCORD_TOKEN=your_discord_bot_token
+# Create .env file
+DISCORD_TOKEN=your_discord_token
 OPENAI_API_KEY=your_openai_api_key
-BUSINESS_API_KEY=your_business_data_api_key
-MONGODB_URI=your_mongodb_connection_string
 ```
 
 4. Run the bot:
@@ -74,32 +78,26 @@ python src/main.py
 ```
 
 ## Project Structure
-
 ```
 ATENA-AI/
 ├── src/
+│   ├── business_intelligence/
+│   │   ├── business_intelligence.py
+│   │   └── market_analysis.py
 │   ├── discord_bot/
 │   │   ├── cogs/
-│   │   │   ├── commands.py      # Business commands
-│   │   │   ├── conversation.py  # Natural language processing
-│   │   │   └── notifications.py # Alert system
-│   │   └── discord_bot.py       # Main bot implementation
-│   ├── business_intelligence/
-│   │   └── business_intelligence.py  # Business logic
+│   │   │   ├── commands.py
+│   │   │   └── business_intelligence.py
+│   │   └── bot.py
 │   ├── meta_agent/
-│   │   ├── meta_agent.py        # Performance monitoring
-│   │   └── self_improvement.py  # System optimization
-│   └── utils/
-│       ├── logger.py            # Logging system
-│       └── error_handler.py     # Error management
+│   │   ├── meta_agent.py
+│   │   └── self_improvement.py
+│   └── main.py
 ├── tests/
+│   ├── business_intelligence/
 │   ├── discord_bot/
-│   │   └── test_commands.py     # Command tests
 │   └── meta_agent/
-│       ├── test_meta_agent.py   # Meta-agent tests
-│       └── test_integration.py  # Integration tests
 ├── requirements.txt
-├── requirements-test.txt
 └── README.md
 ```
 
@@ -107,17 +105,23 @@ ATENA-AI/
 
 Run the test suite:
 ```bash
-pip install -r requirements-test.txt
-python -m pytest tests/
+python -m pytest tests/ -v
+```
+
+Run specific test categories:
+```bash
+python -m pytest tests/business_intelligence/ -v
+python -m pytest tests/discord_bot/ -v
+python -m pytest tests/meta_agent/ -v
 ```
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ## License
 
@@ -126,8 +130,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Acknowledgments
 
 - OpenAI for GPT models
-- Discord.py team
-- Contributors and maintainers
+- Discord.py team for the Discord API wrapper
+- All contributors who have helped shape ATENA-AI
 
 ## Support
 

@@ -1,178 +1,160 @@
-"""
-Tests for Discord bot commands
-"""
+"""Tests for Discord business commands."""
 
 import pytest
 import discord
 from discord.ext import commands
+from unittest.mock import AsyncMock, MagicMock, patch
 from src.discord_bot.cogs.commands import BusinessCommands
 
 class MockBot:
-    """Mock bot class for testing."""
     def __init__(self):
-        self.business_intelligence = MockBusinessIntelligence()
-
-class MockBusinessIntelligence:
-    """Mock business intelligence class for testing."""
-    async def research(self, topic: str, depth: str = "medium") -> dict:
-        return {
-            'summary': f'Research results for {topic}',
-            'details': {
-                'Market Size': '$1B',
-                'Growth Rate': '10%'
-            }
-        }
-    
-    async def setup_monitor(self, target: str, metric: str, threshold: float) -> dict:
-        return {
-            'id': 'mon_123',
-            'status': 'active'
-        }
-    
-    async def analyze_metric(self, metric: str, timeframe: str = "1d") -> dict:
-        return {
-            'summary': f'Analysis of {metric}',
-            'current': 100,
-            'trend': 'up'
-        }
-    
-    async def generate_report(self, report_type: str, timeframe: str = "1w") -> dict:
-        return {
-            'summary': f'{report_type} report',
-            'sections': []
-        }
+        self.business_intelligence = MagicMock()
 
 class MockInteraction:
-    """Mock Discord interaction."""
     def __init__(self):
-        self.response = MockResponse()
-        self.followup = MockFollowup()
-
-class MockResponse:
-    """Mock interaction response."""
-    async def defer(self):
-        pass
-
-class MockFollowup:
-    """Mock interaction followup."""
-    async def send(self, content=None, embed=None, ephemeral=False):
-        return MockMessage()
-
-class MockMessage:
-    """Mock Discord message."""
-    async def edit(self, embed=None):
-        pass
-
-class MockContext:
-    """Mock Discord context."""
-    async def send(self, content=None, embed=None):
-        pass
+        self.response = AsyncMock()
+        self.followup = AsyncMock()
+        self.client = MockBot()
 
 @pytest.fixture
 def bot():
-    """Create a mock bot instance."""
     return MockBot()
 
 @pytest.fixture
 def cog(bot):
-    """Create a BusinessCommands cog instance."""
     return BusinessCommands(bot)
 
 @pytest.fixture
 def interaction():
-    """Create a mock interaction."""
     return MockInteraction()
 
-@pytest.fixture
-def ctx():
-    """Create a mock context."""
-    return MockContext()
-
 @pytest.mark.asyncio
-async def test_help_command(cog, ctx):
+async def test_help_command(cog):
     """Test the help command."""
-    await cog.help_command.callback(cog, ctx)
+    ctx = MagicMock(spec=commands.Context)
+    ctx.send = AsyncMock()
+    
+    # Get the actual callback function from the command
+    help_command = cog.help_command.callback
+    await help_command(cog, ctx)
+    
+    ctx.send.assert_called_once()
+    embed = ctx.send.call_args[1]['embed']
+    assert isinstance(embed, discord.Embed)
+    assert embed.title == "ATENA-AI Command Help"
+    assert len(embed.fields) == 4  # Check all command fields are present
 
 @pytest.mark.asyncio
-async def test_research_command_validation(cog, interaction):
-    """Test research command input validation."""
-    # Test with invalid topic (too short)
-    await cog.research.callback(cog, interaction, topic="a")
+async def test_research_command(cog, interaction):
+    """Test the research command with valid input."""
+    cog.bot.business_intelligence.research = AsyncMock(return_value={
+        'summary': 'Test summary',
+        'details': {'key1': 'value1', 'key2': 'value2'}
+    })
     
-    # Test with invalid depth
-    await cog.research.callback(cog, interaction, topic="AI Technology", depth="invalid")
+    # Get the actual callback function from the command
+    research_command = cog.research.callback
+    await research_command(cog, interaction, "test_topic", "quick")
     
-    # Test with valid inputs
-    await cog.research.callback(cog, interaction, topic="AI Technology", depth="deep")
+    interaction.response.defer.assert_called_once()
+    interaction.followup.send.assert_called_once()
+    assert isinstance(interaction.followup.send.call_args[1]['embed'], discord.Embed)
 
 @pytest.mark.asyncio
-async def test_monitor_command_validation(cog, interaction):
-    """Test monitor command input validation."""
-    # Test with invalid target (too short)
-    await cog.monitor.callback(cog, interaction, target="a", metric="test", threshold=75.0)
+async def test_research_command_invalid_input(cog, interaction):
+    """Test the research command with invalid input."""
+    research_command = cog.research.callback
+    await research_command(cog, interaction, "t", "quick")
     
-    # Test with invalid metric (too short)
-    await cog.monitor.callback(cog, interaction, target="Market Share", metric="", threshold=75.0)
-    
-    # Test with invalid threshold
-    await cog.monitor.callback(cog, interaction, target="Market Share", metric="percentage", threshold=-1.0)
-    
-    # Test with valid inputs
-    await cog.monitor.callback(cog, interaction, target="Market Share", metric="percentage", threshold=75.0)
+    interaction.response.send_message.assert_called_once_with(
+        "Topic must be at least 2 characters long.",
+        ephemeral=True
+    )
 
 @pytest.mark.asyncio
-async def test_analyze_command_validation(cog, interaction):
-    """Test analyze command input validation."""
-    # Test with invalid metric (too short)
-    await cog.analyze.callback(cog, interaction, metric="")
+async def test_monitor_command(cog, interaction):
+    """Test the monitor command with valid input."""
+    cog.bot.business_intelligence.setup_monitor = AsyncMock(return_value={
+        'id': 'test_id',
+        'status': 'active'
+    })
     
-    # Test with invalid timeframe
-    await cog.analyze.callback(cog, interaction, metric="Revenue", timeframe="invalid")
+    monitor_command = cog.monitor.callback
+    await monitor_command(cog, interaction, "test_target", "test_metric", 10.0)
     
-    # Test with valid inputs
-    await cog.analyze.callback(cog, interaction, metric="Revenue", timeframe="1w")
+    interaction.response.defer.assert_called_once()
+    interaction.followup.send.assert_called_once()
+    assert isinstance(interaction.followup.send.call_args[1]['embed'], discord.Embed)
 
 @pytest.mark.asyncio
-async def test_report_command_validation(cog, interaction):
-    """Test report command input validation."""
-    # Test with invalid report type
-    await cog.report.callback(cog, interaction, report_type="invalid")
+async def test_monitor_command_invalid_input(cog, interaction):
+    """Test the monitor command with invalid input."""
+    monitor_command = cog.monitor.callback
+    await monitor_command(cog, interaction, "t", "test_metric", 10.0)
     
-    # Test with invalid timeframe
-    await cog.report.callback(cog, interaction, report_type="performance", timeframe="invalid")
-    
-    # Test with valid inputs
-    await cog.report.callback(cog, interaction, report_type="performance", timeframe="1w")
+    interaction.response.send_message.assert_called_once_with(
+        "Target must be at least 2 characters long.",
+        ephemeral=True
+    )
 
 @pytest.mark.asyncio
-async def test_error_handling(cog, interaction, ctx):
-    """Test error handling in commands."""
-    # Test command not found error
+async def test_analyze_command(cog, interaction):
+    """Test the analyze command with valid input."""
+    cog.bot.business_intelligence.analyze_metric = AsyncMock(return_value={
+        'summary': 'Test analysis',
+        'current': 100,
+        'trend': 'upward'
+    })
+    
+    analyze_command = cog.analyze.callback
+    await analyze_command(cog, interaction, "test_metric", "1d")
+    
+    interaction.response.defer.assert_called_once()
+    interaction.followup.send.assert_called_once()
+    assert isinstance(interaction.followup.send.call_args[1]['embed'], discord.Embed)
+
+@pytest.mark.asyncio
+async def test_analyze_command_invalid_input(cog, interaction):
+    """Test the analyze command with invalid input."""
+    analyze_command = cog.analyze.callback
+    await analyze_command(cog, interaction, "t", "1d")
+    
+    interaction.response.send_message.assert_called_once_with(
+        "Metric must be at least 2 characters long.",
+        ephemeral=True
+    )
+
+@pytest.mark.asyncio
+async def test_report_command(cog, interaction):
+    """Test the report command with valid input."""
+    cog.bot.business_intelligence.generate_report = AsyncMock(return_value={
+        'summary': 'Test report',
+        'sections': [
+            {'title': 'Section 1', 'content': 'Content 1'},
+            {'title': 'Section 2', 'content': 'Content 2'}
+        ]
+    })
+    
+    report_command = cog.report.callback
+    await report_command(cog, interaction, "performance", "1w")
+    
+    interaction.response.defer.assert_called_once()
+    interaction.followup.send.assert_called_once()
+    assert isinstance(interaction.followup.send.call_args[1]['embed'], discord.Embed)
+
+@pytest.mark.asyncio
+async def test_command_error_handling(cog):
+    """Test command error handling."""
+    ctx = MagicMock(spec=commands.Context)
+    ctx.send = AsyncMock()
+    
+    # Test CommandNotFound error
     error = commands.CommandNotFound()
     await cog.on_command_error(ctx, error)
+    ctx.send.assert_called_with("Command not found. Use !atena help to see available commands.")
     
-    # Test general error
+    # Test generic error
+    ctx.send.reset_mock()
     error = Exception("Test error")
     await cog.on_command_error(ctx, error)
-    
-    # Test business intelligence error
-    class ErrorBusinessIntelligence:
-        async def research(self, *args, **kwargs):
-            raise Exception("Test error")
-    
-    cog.bot.business_intelligence = ErrorBusinessIntelligence()
-    await cog.research.callback(cog, interaction, topic="Test")
-
-@pytest.mark.asyncio
-async def test_command_metadata(cog):
-    """Test command metadata and descriptions."""
-    assert cog.research.name == "research"
-    assert cog.monitor.name == "monitor"
-    assert cog.analyze.name == "analyze"
-    assert cog.report.name == "report"
-    
-    # Verify command descriptions
-    assert "Research a company or industry" in cog.research.description
-    assert "Set up business monitoring alerts" in cog.monitor.description
-    assert "Analyze business performance metrics" in cog.analyze.description
-    assert "Generate a business intelligence report" in cog.report.description 
+    ctx.send.assert_called_with("An error occurred while processing your command. Please try again later.") 

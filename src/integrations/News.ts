@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { NewsArticle } from '../types';
-import { encode } from 'gpt-3-encoder';
+import tiktoken from 'tiktoken';
 import { chunk } from 'lodash';
 import { sleep } from '../utils/helpers';
 
@@ -10,6 +10,7 @@ export class NewsIntegration {
     private maxTokensPerRequest = 4000;
     private retryDelay = 2000;
     private maxRetries = 3;
+    private encoding = tiktoken.get_encoding("cl100k_base");
 
     constructor(apiKey: string, googleWorkspace: any) {
         this.openai = new OpenAI({ apiKey });
@@ -60,7 +61,7 @@ export class NewsIntegration {
         let currentTokens = 0;
 
         for (const doc of docs) {
-            const docTokens = encode(JSON.stringify(doc)).length;
+            const docTokens = this.encoding.encode(JSON.stringify(doc)).length;
 
             if (currentTokens + docTokens > this.maxTokensPerRequest) {
                 batches.push(currentBatch);
@@ -90,7 +91,7 @@ export class NewsIntegration {
 
     private async extractTopicsFromDocs(docs: any[]) {
         const prompt = this.createExtractPrompt(docs);
-        if (encode(prompt).length > this.maxTokensPerRequest) {
+        if (this.encoding.encode(prompt).length > this.maxTokensPerRequest) {
             throw new Error('Batch too large');
         }
 

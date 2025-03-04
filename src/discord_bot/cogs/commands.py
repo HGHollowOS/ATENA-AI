@@ -17,7 +17,7 @@ class BusinessCommands(commands.Cog):
         self.bot = bot
         
     @commands.command(name="help")
-    async def help_command(self, ctx):
+    async def help_command(self, ctx: commands.Context):
         """Display help information for ATENA-AI commands."""
         embed = discord.Embed(
             title="ATENA-AI Command Help",
@@ -51,7 +51,7 @@ class BusinessCommands(commands.Cog):
         
         await ctx.send(embed=embed)
 
-    @app_commands.command(name="research")
+    @app_commands.command()
     @app_commands.describe(
         topic="Company or industry to research",
         depth="Depth of research (quick/medium/deep)"
@@ -90,7 +90,7 @@ class BusinessCommands(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="monitor")
+    @app_commands.command()
     @app_commands.describe(
         target="Metric target to monitor",
         metric="Type of metric",
@@ -139,7 +139,7 @@ class BusinessCommands(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="analyze")
+    @app_commands.command()
     @app_commands.describe(
         metric="Metric to analyze",
         timeframe="Analysis timeframe (1d/1w/1m)"
@@ -178,7 +178,7 @@ class BusinessCommands(commands.Cog):
                 ephemeral=True
             )
 
-    @app_commands.command(name="report")
+    @app_commands.command()
     @app_commands.describe(
         report_type="Type of report to generate",
         timeframe="Report timeframe (1d/1w/1m)"
@@ -218,7 +218,8 @@ class BusinessCommands(commands.Cog):
                 ephemeral=True
             )
 
-    async def on_command_error(self, ctx, error):
+    @commands.Cog.listener()
+    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
         """Handle command errors."""
         if isinstance(error, commands.CommandNotFound):
             await ctx.send("Command not found. Use !atena help to see available commands.")

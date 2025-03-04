@@ -1,6 +1,156 @@
 # ATENA-AI: Advanced Business Intelligence Assistant
 
-ATENA-AI is a cutting-edge business intelligence and research assistant powered by artificial intelligence. It helps organizations make data-driven decisions by providing real-time insights, automated research, and intelligent monitoring of business metrics.
+ATENA-AI is an advanced business intelligence and automation platform that supports company tasks through natural conversation and autonomous research capabilities.
+
+## Features
+
+- **Proactive Business Intelligence**: Automated research, monitoring, and analysis of business metrics
+- **Natural Discord Interaction**: Intuitive slash commands for business operations
+- **Self-Improvement Systems**: Continuous learning and optimization capabilities
+- **Business Workflow Automation**: Streamlined processes for common business tasks
+
+## Discord Commands
+
+ATENA-AI provides several slash commands for business operations:
+
+### Research Command
+Research companies and industries with varying levels of depth.
+
+```
+/research [topic] [depth]
+```
+
+Parameters:
+- `topic`: Company or industry to research
+- `depth`: Research depth (quick/medium/deep)
+
+Example:
+```
+/research topic:"Tesla" depth:"deep"
+/research topic:"AI Industry" depth:"quick"
+```
+
+### Monitor Command
+Set up monitoring for business metrics with customizable alerts.
+
+```
+/monitor [target] [metric] [threshold]
+```
+
+Parameters:
+- `target`: Metric target to monitor
+- `metric`: Type of metric
+- `threshold`: Alert threshold value
+
+Example:
+```
+/monitor target:"Market Share" metric:"percentage" threshold:75.0
+/monitor target:"Revenue" metric:"growth_rate" threshold:10.0
+```
+
+### Analyze Command
+Analyze business performance metrics over specified timeframes.
+
+```
+/analyze [metric] [timeframe]
+```
+
+Parameters:
+- `metric`: Metric to analyze
+- `timeframe`: Analysis period (1d/1w/1m)
+
+Example:
+```
+/analyze metric:"Profit Margin" timeframe:"1w"
+/analyze metric:"Customer Acquisition" timeframe:"1m"
+```
+
+### Report Command
+Generate comprehensive business intelligence reports.
+
+```
+/report [type] [timeframe]
+```
+
+Parameters:
+- `type`: Report type (performance/market/competitor)
+- `timeframe`: Report period (1d/1w/1m)
+
+Example:
+```
+/report report_type:"Performance" timeframe:"1w"
+/report report_type:"Market Analysis" timeframe:"1m"
+```
+
+## Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/ATENA-AI.git
+cd ATENA-AI
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Set up environment variables:
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+```
+
+4. Run the bot:
+```bash
+python src/main.py
+```
+
+## Project Structure
+
+```
+ATENA-AI/
+├── src/
+│   ├── discord_bot/
+│   │   ├── cogs/
+│   │   │   └── commands.py
+│   │   └── bot.py
+│   ├── meta_agent/
+│   │   └── meta_agent.py
+│   └── main.py
+├── tests/
+│   ├── discord_bot/
+│   │   └── test_commands.py
+│   └── meta_agent/
+│       └── test_integration.py
+├── requirements.txt
+└── README.md
+```
+
+## Testing
+
+Run the test suite:
+```bash
+pytest tests/
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- OpenAI for advanced language models
+- Discord.py team for the Discord API wrapper
+- All contributors who have helped shape ATENA-AI
 
 ## 🌟 Key Features
 

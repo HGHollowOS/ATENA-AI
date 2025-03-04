@@ -1,211 +1,256 @@
+"""
+Tests for the meta-agent module.
+"""
+
 import pytest
-from unittest.mock import Mock, patch
-from datetime import datetime, timedelta
+from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 from src.meta_agent.meta_agent import (
     MetaAgent,
-    PerformanceMetric,
-    MetricSnapshot,
+    SystemMetrics,
     DecisionOutcome,
-    ImprovementAction
+    ImprovementAction,
+    MetricType,
+    PerformanceMetric
 )
 
 @pytest.fixture
 def meta_agent():
     """Create a MetaAgent instance for testing."""
-    config = {
-        'analysis_interval': 60,  # 1 minute for testing
-        'thresholds': {
-            'api_latency': 2.0,
-            'research_accuracy': 0.8,
-            'alert_relevance': 0.7,
-            'conversation_quality': 0.75,
-            'partnership_match': 0.8,
-        }
-    }
-    return MetaAgent(config)
+    return MetaAgent()
+
+@pytest.fixture
+def system_metrics():
+    """Create a SystemMetrics instance for testing."""
+    return SystemMetrics(
+        response_time=0.1,
+        accuracy=0.95,
+        error_rate=0.05,
+        success_rate=0.95,
+        latency=0.1,
+        cpu_usage=30.0,
+        memory_usage=50.0,
+        throughput=100,
+        user_satisfaction=0.8
+    )
+
+@pytest.fixture
+def poor_system_metrics():
+    """Create sample system metrics with poor performance."""
+    return SystemMetrics(
+        response_time=3.0,
+        accuracy=0.7,
+        error_rate=0.4,
+        success_rate=0.6,
+        latency=2.0,
+        cpu_usage=80.0,
+        memory_usage=90.0,
+        throughput=50,
+        user_satisfaction=0.5,
+        timestamp=datetime.now()
+    )
+
+@pytest.fixture
+def decision_outcome():
+    """Create a DecisionOutcome instance for testing."""
+    return DecisionOutcome(
+        decision_id="test_decision",
+        action_type="optimization",
+        impact=0.8,
+        success=True,
+        metrics={"accuracy": 0.95},
+        context={"environment": "test"}
+    )
+
+@pytest.fixture
+def improvement_action():
+    """Create an ImprovementAction instance for testing."""
+    return ImprovementAction(
+        action_id="test_action",
+        metric_type=MetricType.ACCURACY,
+        action_type="optimization",
+        target_metric=MetricType.ACCURACY,
+        parameters={"learning_rate": 0.01},
+        changes={"accuracy": 0.05}
+    )
 
 @pytest.mark.asyncio
-async def test_record_metrics(meta_agent):
-    metrics = {
-        "response_time": 1.5,
-        "token_usage": 1000,
-        "success_rate": 0.95
-    }
-    
-    await meta_agent.record_metrics(metrics)
+async def test_meta_agent_initialization():
+    """Test MetaAgent initialization."""
+    agent = MetaAgent()
+    assert agent.improvement_threshold == 0.7
+    assert agent.evaluation_window == 10
+    assert agent.min_samples_for_evaluation == 5
+
+@pytest.mark.asyncio
+async def test_gather_metrics(meta_agent):
+    """Test gathering system metrics."""
+    metrics = await meta_agent.gather_metrics()
+    assert isinstance(metrics, SystemMetrics)
+    assert 0 <= metrics.response_time <= 1
+    assert 0 <= metrics.accuracy <= 1
+    assert 0 <= metrics.error_rate <= 1
+
+@pytest.mark.asyncio
+async def test_evaluate_performance(meta_agent, system_metrics):
+    """Test performance evaluation."""
+    await meta_agent.record_metrics(system_metrics)
+    evaluation = await meta_agent.evaluate_performance()
+    assert isinstance(evaluation, dict)
+    assert "accuracy" in evaluation
+    assert "error_rate" in evaluation
+    assert "response_time" in evaluation
+
+@pytest.mark.asyncio
+async def test_trigger_improvement(meta_agent, system_metrics):
+    """Test improvement triggering."""
+    await meta_agent.record_metrics(system_metrics)
+    stats = meta_agent._calculate_metric_stats(MetricType.ACCURACY)
+    await meta_agent._trigger_improvement(MetricType.ACCURACY, stats)
+    assert len(meta_agent.improvement_history) > 0
+
+@pytest.mark.asyncio
+async def test_record_metrics(meta_agent, system_metrics):
+    """Test recording metrics."""
+    await meta_agent.record_metrics(system_metrics)
     assert len(meta_agent.metrics_history) == 1
-    assert meta_agent.metrics_history[0]["response_time"] == 1.5
+    assert len(meta_agent.performance_history) == 1
 
 @pytest.mark.asyncio
-async def test_analyze_performance(meta_agent):
-    # Add test metrics
-    metrics_list = [
-        {
-            "response_time": 1.5,
-            "token_usage": 1000,
-            "success_rate": 0.95,
-            "timestamp": datetime.now()
-        },
-        {
-            "response_time": 1.8,
-            "token_usage": 1200,
-            "success_rate": 0.90,
-            "timestamp": datetime.now()
-        }
-    ]
-    
-    meta_agent.metrics_history.extend(metrics_list)
-    analysis = await meta_agent.analyze_performance()
-    
-    assert "response_time" in analysis
-    assert "token_usage" in analysis
-    assert "success_rate" in analysis
-
-@pytest.mark.asyncio
-async def test_trigger_improvement(meta_agent):
-    analysis = {
-        "response_time": {
-            "trend": "increasing",
-            "current": 2.0,
-            "threshold": 1.5
-        }
-    }
-    
-    improvement = await meta_agent.trigger_improvement(analysis)
-    assert improvement is not None
-    assert "action" in improvement
-    assert "target" in improvement
-
-@pytest.mark.asyncio
-async def test_record_metric(meta_agent):
-    """Test recording performance metrics."""
-    # Create test metric
-    snapshot = MetricSnapshot(
-        metric_type=PerformanceMetric.API_LATENCY,
-        value=1.5,
-        timestamp=datetime.now(),
-        context={'endpoint': 'test_api'},
-        source_module='api_client'
-    )
-    
-    # Record metric
-    meta_agent.record_metric(snapshot)
-    
-    # Verify metric was recorded
-    assert len(meta_agent.performance_history[PerformanceMetric.API_LATENCY]) == 1
-    recorded = meta_agent.performance_history[PerformanceMetric.API_LATENCY][0]
-    assert recorded.value == 1.5
-    assert recorded.source_module == 'api_client'
-
-@pytest.mark.asyncio
-async def test_record_poor_metric_triggers_action(meta_agent):
-    """Test that recording a poor metric triggers immediate action."""
-    # Create test metric with very poor performance
-    snapshot = MetricSnapshot(
-        metric_type=PerformanceMetric.API_LATENCY,
-        value=5.0,  # Well above threshold
-        timestamp=datetime.now(),
-        context={'endpoint': 'test_api'},
-        source_module='api_client'
-    )
-    
-    # Record metric
-    meta_agent.record_metric(snapshot)
-    
-    # Verify immediate action was triggered
-    assert len(meta_agent.improvement_queue) == 1
-    action = meta_agent.improvement_queue[0]
-    assert action.priority == 5  # Highest priority
-    assert action.action_type == 'emergency_optimization'
-    assert action.target_module == 'api_client'
-
-@pytest.mark.asyncio
-async def test_record_decision(meta_agent):
-    """Test recording and analyzing decision outcomes."""
-    # Create test decision
-    decision = DecisionOutcome(
-        decision_id='test_1',
-        decision_type='partnership_recommendation',
-        context={'industry': 'tech', 'size': 'large'},
-        timestamp=datetime.now(),
-        outcome={'success': True},
-        feedback={'relevance': 0.9}
-    )
-    
-    # Record decision
-    meta_agent.record_decision(decision)
-    
-    # Verify decision was recorded
+async def test_record_decision(meta_agent, decision_outcome):
+    """Test recording decision outcomes."""
+    await meta_agent.record_decision(decision_outcome)
     assert len(meta_agent.decision_history) == 1
-    recorded = meta_agent.decision_history[0]
-    assert recorded.decision_id == 'test_1'
-    assert recorded.outcome['success'] is True
 
 @pytest.mark.asyncio
-async def test_calculate_trend(meta_agent):
-    """Test trend calculation for performance metrics."""
-    values = [1.0, 1.2, 1.4, 1.6, 1.8]  # Increasing trend
-    trend = meta_agent._calculate_trend(values)
-    assert trend > 0
-    
-    values = [1.8, 1.6, 1.4, 1.2, 1.0]  # Decreasing trend
-    trend = meta_agent._calculate_trend(values)
-    assert trend < 0
+async def test_record_improvement(meta_agent, improvement_action):
+    """Test recording improvement actions."""
+    await meta_agent.record_improvement(improvement_action)
+    assert len(meta_agent.improvement_history) == 1
 
 @pytest.mark.asyncio
-async def test_get_pending_improvements(meta_agent):
-    """Test retrieving and prioritizing pending improvements."""
-    # Add multiple improvement actions
-    actions = [
-        ImprovementAction(
-            action_type='optimize_performance',
-            target_module='api_client',
-            parameters={'metric': 'api_latency'},
-            reason='Test improvement 1',
-            priority=3,
-            timestamp=datetime.now()
-        ),
-        ImprovementAction(
-            action_type='emergency_optimization',
-            target_module='business_intelligence',
-            parameters={'metric': 'research_accuracy'},
-            reason='Test improvement 2',
-            priority=5,
+async def test_evaluate_performance_triggers_improvement(meta_agent, poor_system_metrics):
+    """Test that poor performance triggers improvement."""
+    # Record multiple poor metrics to ensure evaluation
+    # Add metrics that show a declining trend and are above the improvement threshold
+    for i in range(meta_agent.min_samples_for_evaluation + 1):
+        metrics = SystemMetrics(
+            response_time=2.0 + i * 0.1,  # Increasing (worse) response time
+            accuracy=0.9 - i * 0.02,      # Decreasing accuracy
+            error_rate=0.2 + i * 0.02,    # Increasing error rate
+            success_rate=0.8 - i * 0.02,  # Decreasing success rate
+            latency=0.5 + i * 0.1,        # Increasing latency
+            cpu_usage=80.0 + i * 1.0,     # Increasing CPU usage
+            memory_usage=70.0 + i * 1.0,  # Increasing memory usage
+            throughput=100 - i * 5,       # Decreasing throughput
+            user_satisfaction=0.7 - i * 0.02,  # Decreasing satisfaction
+            resource_usage={"cpu": 0.8, "memory": 0.7},
             timestamp=datetime.now()
         )
-    ]
+        await meta_agent.record_metrics(metrics)
     
-    meta_agent.improvement_queue.extend(actions)
+    # Evaluate performance which should trigger improvement
+    await meta_agent._evaluate_performance()
     
-    # Get pending improvements
-    pending = await meta_agent.get_pending_improvements()
-    
-    # Verify prioritization
-    assert len(pending) == 2
-    assert pending[0].priority == 5  # Highest priority first
-    assert pending[1].priority == 3
-    
-    # Verify queue was cleared
-    assert len(meta_agent.improvement_queue) == 0
+    # Verify that improvement was triggered
+    assert len(meta_agent.improvement_history) > 0
+    improvement = meta_agent.improvement_history[0]
+    assert isinstance(improvement, ImprovementAction)
+    assert improvement.action_type == "optimization"
 
 @pytest.mark.asyncio
-async def test_extract_common_factors(meta_agent):
-    """Test extraction of common factors from decision contexts."""
-    contexts = [
-        {'industry': 'tech', 'size': 'large', 'score': 0.8},
-        {'industry': 'tech', 'size': 'large', 'score': 0.9},
-        {'industry': 'tech', 'size': 'large', 'score': 0.85}
-    ]
+async def test_analyze_decision_impact(meta_agent, system_metrics):
+    """Test analyzing decision impact."""
+    # First record some metrics to avoid index error
+    await meta_agent.record_metrics(system_metrics)
     
-    factors = meta_agent._extract_common_factors(contexts)
-    
-    assert 'industry' in factors
-    assert factors['industry'] == 'tech'
-    assert 'size' in factors
-    assert factors['size'] == 'large'
-    assert 'score' in factors
-    assert factors['score'] == 0.85
-    assert 'min' in factors['score']
-    assert factors['score'] == 0.8
-    assert 'max' in factors['score']
-    assert 'mean' in factors['score'] 
+    negative_outcome = DecisionOutcome(
+        decision_id="test_negative",
+        action_type="optimization",
+        impact=-0.2,
+        success=False,
+        metrics={"accuracy": 0.7},
+        context={"environment": "test"}
+    )
+    await meta_agent.record_decision(negative_outcome)
+    assert len(meta_agent.improvement_history) > 0
+
+@pytest.mark.asyncio
+async def test_get_performance_metrics(meta_agent, system_metrics):
+    """Test retrieving performance metrics."""
+    await meta_agent.record_metrics(system_metrics)
+    metrics = meta_agent.get_performance_metrics()
+    assert len(metrics) == 1
+    assert isinstance(metrics[0], SystemMetrics)
+
+@pytest.mark.asyncio
+async def test_get_decision_history(meta_agent, decision_outcome):
+    """Test retrieving decision history."""
+    await meta_agent.record_decision(decision_outcome)
+    decisions = meta_agent.get_decision_history()
+    assert len(decisions) == 1
+    assert isinstance(decisions[0], DecisionOutcome)
+
+@pytest.mark.asyncio
+async def test_get_improvement_history(meta_agent, improvement_action):
+    """Test retrieving improvement history."""
+    await meta_agent.record_improvement(improvement_action)
+    improvements = meta_agent.get_improvement_history()
+    assert len(improvements) == 1
+    assert isinstance(improvements[0], ImprovementAction)
+
+def test_metric_type_enum():
+    """Test MetricType enum values."""
+    assert MetricType.RESPONSE_TIME.value == "response_time"
+    assert MetricType.ACCURACY.value == "accuracy"
+    assert MetricType.ERROR_RATE.value == "error_rate"
+
+def test_performance_metric_creation():
+    """Test creating performance metrics."""
+    metrics = SystemMetrics(
+        response_time=0.1,
+        accuracy=0.95,
+        error_rate=0.05,
+        success_rate=0.95,
+        latency=0.1,
+        cpu_usage=30.0,
+        memory_usage=50.0,
+        throughput=100,
+        user_satisfaction=0.8
+    )
+    assert isinstance(metrics, SystemMetrics)
+    assert metrics.response_time == 0.1
+    assert metrics.accuracy == 0.95
+
+@pytest.mark.asyncio
+async def test_calculate_performance_score(meta_agent, system_metrics):
+    """Test calculating performance score."""
+    await meta_agent.record_metrics(system_metrics)
+    metrics = meta_agent.get_performance_metrics()
+    trends = await meta_agent.analyze_trends(metrics)
+    decisions = meta_agent.get_decision_history()
+    score = await meta_agent.calculate_performance_score(trends, decisions)
+    assert isinstance(score, float)
+    assert 0 <= score <= 1
+
+@pytest.mark.asyncio
+async def test_identify_improvement_areas(meta_agent, system_metrics):
+    """Test identifying areas for improvement."""
+    await meta_agent.record_metrics(system_metrics)
+    areas = await meta_agent.identify_improvement_areas()
+    assert isinstance(areas, list)
+
+@pytest.mark.asyncio
+async def test_generate_improvement_plan(meta_agent, system_metrics):
+    """Test generating improvement plan."""
+    await meta_agent.record_metrics(system_metrics)
+    plan = await meta_agent.generate_improvement_plan()
+    assert isinstance(plan, dict)
+
+@pytest.mark.asyncio
+async def test_execute_improvements(meta_agent, system_metrics):
+    """Test executing improvements."""
+    await meta_agent.record_metrics(system_metrics)
+    plan = await meta_agent.generate_improvement_plan()
+    result = await meta_agent.execute_improvements(plan)
+    assert isinstance(result, bool) 

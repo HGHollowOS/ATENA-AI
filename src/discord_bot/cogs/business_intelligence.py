@@ -1,16 +1,22 @@
 """
 Business Intelligence cog for ATENA-AI Discord bot.
-Provides commands for company research, market analysis, and partnership opportunities.
+Provides commands for company research, market analysis, and partnership opportunities,
+with support for proactive notifications and natural conversation.
 """
 
 import discord
 from discord.ext import commands
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
+import asyncio
+import re
+from datetime import datetime, timedelta
 from src.business_intelligence.business_intelligence import (
     BusinessIntelligence,
     CompanyProfile,
-    MarketAnalysis
+    MarketAnalysis,
+    BusinessAlert,
+    IndustrySegment
 )
 
 logger = logging.getLogger(__name__)
@@ -22,6 +28,265 @@ class BusinessIntelligenceCog(commands.Cog):
         """Initialize the Business Intelligence cog."""
         self.bot = bot
         self.bi_service = BusinessIntelligence(bot.config)
+        self.notification_channels: Dict[int, int] = {}  # guild_id -> channel_id
+        self.monitoring_task = None
+        self.conversation_contexts: Dict[int, Dict[str, Any]] = {}  # channel_id -> context
+        
+        # Natural language patterns for commands
+        self.nl_patterns = {
+            'research': r'(?i)research|look up|tell me about|what do you know about|find info|company info',
+            'market': r'(?i)market|industry|sector|segment analysis|trends',
+            'partners': r'(?i)partners|partnerships|opportunities|collaboration|potential deals',
+            'monitor': r'(?i)monitor|track|watch|follow|keep an eye on',
+            'alert': r'(?i)alert|notify|inform|update me|let me know'
+        }
+    
+    async def cog_load(self):
+        """Start background tasks when cog is loaded."""
+        self.monitoring_task = asyncio.create_task(self.monitor_and_notify())
+    
+    async def cog_unload(self):
+        """Clean up when cog is unloaded."""
+        if self.monitoring_task:
+            self.monitoring_task.cancel()
+    
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """Handle natural language interactions."""
+        # Ignore bot messages
+        if message.author.bot:
+            return
+        
+        # Check if message mentions the bot or is in DM
+        is_dm = isinstance(message.channel, discord.DMChannel)
+        is_mentioned = self.bot.user in message.mentions
+        
+        if not (is_dm or is_mentioned):
+            return
+        
+        # Remove bot mention from message
+        content = message.content.replace(f'<@{self.bot.user.id}>', '').strip()
+        
+        # Process natural language input
+        await self._process_natural_language(message, content)
+    
+    async def _process_natural_language(self, message: discord.Message, content: str):
+        """Process natural language input and route to appropriate handler."""
+        try:
+            # Check for conversation context
+            context = self.conversation_contexts.get(message.channel.id, {})
+            
+            if context.get('expecting_response'):
+                # Handle follow-up in conversation
+                await self._handle_conversation_follow_up(message, content, context)
+                return
+            
+            # Match against patterns
+            if re.search(self.nl_patterns['research'], content):
+                # Extract company name
+                company_match = re.search(r'(?i)about\s+([a-zA-Z0-9\s]+)', content)
+                if company_match:
+                    company_name = company_match.group(1).strip()
+                    await self.research_company(message.channel, company_name)
+                else:
+                    # Ask for company name
+                    self.conversation_contexts[message.channel.id] = {
+                        'expecting_response': True,
+                        'intent': 'research',
+                        'timestamp': datetime.now()
+                    }
+                    await message.channel.send("Which company would you like me to research?")
+            
+            elif re.search(self.nl_patterns['market'], content):
+                # Extract industry/segment
+                segment_match = re.search(r'(?i)(satellite|power|propulsion|communications|earth observation|manufacturing|debris)', content)
+                if segment_match:
+                    segment = segment_match.group(1).strip()
+                    await self.analyze_market(message.channel, segment)
+                else:
+                    # Ask for segment
+                    self.conversation_contexts[message.channel.id] = {
+                        'expecting_response': True,
+                        'intent': 'market',
+                        'timestamp': datetime.now()
+                    }
+                    await message.channel.send(
+                        "Which space industry segment would you like me to analyze?\n"
+                        "Options: satellite servicing, power systems, propulsion, communications, "
+                        "earth observation, space manufacturing, debris removal"
+                    )
+            
+            elif re.search(self.nl_patterns['partners'], content):
+                # Start partnership discovery conversation
+                self.conversation_contexts[message.channel.id] = {
+                    'expecting_response': True,
+                    'intent': 'partners',
+                    'step': 'company',
+                    'timestamp': datetime.now()
+                }
+                await message.channel.send(
+                    "I'll help you find partnership opportunities. "
+                    "First, which company should we focus on?"
+                )
+            
+            else:
+                await message.channel.send(
+                    "I can help you with:\n"
+                    "• Company research\n"
+                    "• Market analysis\n"
+                    "• Finding partnership opportunities\n"
+                    "Just let me know what you'd like to explore!"
+                )
+            
+        except Exception as e:
+            logger.error(f"Error processing natural language input: {e}")
+            await message.channel.send("I encountered an error processing your request.")
+    
+    async def _handle_conversation_follow_up(
+        self,
+        message: discord.Message,
+        content: str,
+        context: Dict[str, Any]
+    ):
+        """Handle follow-up messages in a conversation."""
+        try:
+            # Check if context is too old
+            if (datetime.now() - context['timestamp']) > timedelta(minutes=5):
+                self.conversation_contexts.pop(message.channel.id, None)
+                await message.channel.send(
+                    "Our conversation timed out. Please start over with your request."
+                )
+                return
+            
+            if context['intent'] == 'research':
+                await self.research_company(message.channel, content)
+                self.conversation_contexts.pop(message.channel.id, None)
+            
+            elif context['intent'] == 'market':
+                await self.analyze_market(message.channel, content)
+                self.conversation_contexts.pop(message.channel.id, None)
+            
+            elif context['intent'] == 'partners':
+                if context['step'] == 'company':
+                    # Store company and ask for criteria
+                    context.update({
+                        'company': content,
+                        'step': 'criteria',
+                        'timestamp': datetime.now()
+                    })
+                    await message.channel.send(
+                        "Great! Do you have any specific criteria for potential partners?\n"
+                        "You can specify:\n"
+                        "• Size range (e.g., startup, enterprise)\n"
+                        "• Location\n"
+                        "• Technology focus\n"
+                        "Or just say 'no' to use default criteria."
+                    )
+                
+                elif context['step'] == 'criteria':
+                    criteria = None
+                    if content.lower() != 'no':
+                        criteria = content
+                    
+                    await self.find_partners(
+                        message.channel,
+                        context['company'],
+                        criteria
+                    )
+                    self.conversation_contexts.pop(message.channel.id, None)
+            
+        except Exception as e:
+            logger.error(f"Error handling conversation follow-up: {e}")
+            await message.channel.send("I encountered an error processing your response.")
+            self.conversation_contexts.pop(message.channel.id, None)
+    
+    async def monitor_and_notify(self):
+        """Background task to monitor for updates and send notifications."""
+        try:
+            # Start the business intelligence monitoring
+            await self.bi_service.start_monitoring()
+            
+            while True:
+                try:
+                    # Get pending alerts
+                    alerts = await self.bi_service.get_pending_alerts()
+                    
+                    for alert in alerts:
+                        await self._send_alert(alert)
+                    
+                    await asyncio.sleep(60)  # Check every minute
+                    
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    logger.error(f"Error in monitoring loop: {e}")
+                    await asyncio.sleep(60)
+            
+        except asyncio.CancelledError:
+            logger.info("Monitoring task cancelled")
+        except Exception as e:
+            logger.error(f"Fatal error in monitoring task: {e}")
+    
+    async def _send_alert(self, alert: BusinessAlert):
+        """Send an alert to notification channels."""
+        try:
+            embed = discord.Embed(
+                title=alert.title,
+                description=alert.description,
+                color=discord.Color.gold() if alert.requires_action else discord.Color.blue(),
+                timestamp=alert.timestamp
+            )
+            
+            # Add suggested actions if any
+            if alert.suggested_actions:
+                embed.add_field(
+                    name="Suggested Actions",
+                    value="\n".join(f"• {action}" for action in alert.suggested_actions),
+                    inline=False
+                )
+            
+            # Add source data summary if available
+            if alert.source_data.get('url'):
+                embed.add_field(
+                    name="Source",
+                    value=alert.source_data['url'],
+                    inline=False
+                )
+            
+            # Send to all notification channels
+            for guild_id, channel_id in self.notification_channels.items():
+                try:
+                    channel = self.bot.get_channel(channel_id)
+                    if channel:
+                        await channel.send(
+                            "🔔 **New Business Intelligence Alert**",
+                            embed=embed
+                        )
+                except Exception as e:
+                    logger.error(f"Error sending alert to channel {channel_id}: {e}")
+            
+        except Exception as e:
+            logger.error(f"Error sending alert: {e}")
+    
+    @commands.command(name='set_notifications')
+    @commands.has_permissions(administrator=True)
+    async def set_notifications(
+        self,
+        ctx: commands.Context,
+        channel: Optional[discord.TextChannel] = None
+    ):
+        """Set the channel for business intelligence notifications."""
+        try:
+            target_channel = channel or ctx.channel
+            self.notification_channels[ctx.guild.id] = target_channel.id
+            
+            await ctx.send(
+                f"✅ Business intelligence notifications will be sent to {target_channel.mention}"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error setting notification channel: {e}")
+            await ctx.send("Failed to set notification channel.")
     
     @commands.command(name='research')
     async def research_company(

@@ -1,428 +1,326 @@
 """
-Meta-Agent Module
-
-This module implements the core meta-agent functionality that monitors system performance,
-evaluates decisions, and triggers self-improvement routines.
-
-The MetaAgent is responsible for:
-1. System Performance Monitoring
-   - Response time tracking
-   - Accuracy measurement
-   - User satisfaction analysis
-   - Error rate calculation
-   - Resource usage monitoring
-
-2. Performance Evaluation
-   - Chain-of-thought reasoning
-   - Trend analysis
-   - Decision quality assessment
-   - Performance scoring
-
-3. Self-Improvement
-   - Improvement area identification
-   - Improvement plan generation
-   - Plan execution and validation
-   - Performance impact assessment
+Meta-Agent module for ATENA-AI.
+Handles performance monitoring, decision evaluation, and self-improvement triggers.
+Focuses on optimizing business intelligence and research outcomes.
 """
 
-from typing import Dict, List, Optional, Tuple
-from datetime import datetime
 import logging
-from pydantic import BaseModel, Field
+from typing import Dict, List, Optional, Any, Set, Tuple
+import json
+from datetime import datetime, timedelta
 import asyncio
 from dataclasses import dataclass
 from enum import Enum
+import numpy as np
+from collections import deque
 
-from ..logging.logger import SystemLogger
-from ..knowledge.knowledge_base import KnowledgeBase
-from ..nlu.intent_analyzer import IntentAnalyzer
-from ..dialogue.context_manager import DialogueContext
+logger = logging.getLogger(__name__)
 
-class PerformanceLevel(Enum):
-    """Enum for system performance levels."""
-    CRITICAL = 0.3
-    WARNING = 0.5
-    OPTIMAL = 0.7
-    EXCELLENT = 0.9
-
-class SystemMetrics(BaseModel):
-    """Model for tracking system performance metrics."""
-    response_time: float = Field(..., description="Average system response time in seconds")
-    accuracy: float = Field(..., description="System accuracy score (0-1)")
-    user_satisfaction: float = Field(..., description="User satisfaction score (0-1)")
-    error_rate: float = Field(..., description="System error rate (0-1)")
-    resource_usage: Dict[str, float] = Field(..., description="Resource usage metrics")
-    timestamp: datetime = Field(default_factory=datetime.now)
-    performance_level: Optional[PerformanceLevel] = None
+class PerformanceMetric(Enum):
+    """Types of performance metrics to monitor."""
+    API_LATENCY = "api_latency"
+    RESEARCH_ACCURACY = "research_accuracy"
+    ALERT_RELEVANCE = "alert_relevance"
+    CONVERSATION_QUALITY = "conversation_quality"
+    PARTNERSHIP_MATCH = "partnership_match"
 
 @dataclass
-class ImprovementArea:
-    """Data class for improvement areas."""
-    name: str
-    current_score: float
-    target_score: float
+class MetricSnapshot:
+    """Data structure for performance metric snapshots."""
+    metric_type: PerformanceMetric
+    value: float
+    timestamp: datetime
+    context: Dict[str, Any]
+    source_module: str
+
+@dataclass
+class DecisionOutcome:
+    """Data structure for tracking decision outcomes."""
+    decision_id: str
+    decision_type: str
+    context: Dict[str, Any]
+    timestamp: datetime
+    outcome: Optional[Dict[str, Any]] = None
+    feedback: Optional[Dict[str, Any]] = None
+
+@dataclass
+class ImprovementAction:
+    """Data structure for self-improvement actions."""
+    action_type: str
+    target_module: str
+    parameters: Dict[str, Any]
+    reason: str
     priority: int
-    impact: float
-    description: str
+    timestamp: datetime
 
 class MetaAgent:
-    """
-    Meta-Agent that monitors system performance and triggers self-improvement routines.
+    """Meta-Agent for monitoring and improving ATENA-AI's performance."""
     
-    This agent is responsible for:
-    1. Gathering performance metrics from all system components
-    2. Analyzing system behavior and decision outcomes
-    3. Identifying areas for improvement
-    4. Triggering self-improvement routines
-    
-    Attributes:
-        logger: System logger instance
-        knowledge_base: Knowledge base instance
-        intent_analyzer: Intent analyzer instance
-        metrics_history: List of historical metrics
-        improvement_threshold: Threshold for triggering improvements
-        max_history_size: Maximum number of metrics to keep in history
-        evaluation_interval: Time between performance evaluations
-    """
-    
-    def __init__(self, improvement_threshold: float = 0.7,
-                 max_history_size: int = 100,
-                 evaluation_interval: int = 300):
-        self.logger = SystemLogger()
-        self.knowledge_base = KnowledgeBase()
-        self.intent_analyzer = IntentAnalyzer()
-        self.metrics_history: List[SystemMetrics] = []
-        self.improvement_threshold = improvement_threshold
-        self.max_history_size = max_history_size
-        self.evaluation_interval = evaluation_interval
-        self._last_evaluation = datetime.now()
-        self._improvement_lock = asyncio.Lock()
+    def __init__(self, config: Dict[str, Any]):
+        """Initialize the Meta-Agent."""
+        self.config = config
+        self.performance_history: Dict[PerformanceMetric, deque] = {
+            metric: deque(maxlen=1000)
+            for metric in PerformanceMetric
+        }
+        self.decision_history: List[DecisionOutcome] = []
+        self.improvement_queue: List[ImprovementAction] = []
+        self.analysis_interval = 300  # 5 minutes
+        self.last_analysis = datetime.now()
         
-    async def gather_metrics(self) -> SystemMetrics:
-        """
-        Collect performance metrics from all system components.
-        
-        Returns:
-            SystemMetrics object containing current system metrics
-            
-        Raises:
-            ValueError: If metric collection fails
-            RuntimeError: If system components are unavailable
-        """
+        # Performance thresholds
+        self.thresholds = {
+            PerformanceMetric.API_LATENCY: 2.0,  # seconds
+            PerformanceMetric.RESEARCH_ACCURACY: 0.8,  # 80%
+            PerformanceMetric.ALERT_RELEVANCE: 0.7,  # 70%
+            PerformanceMetric.CONVERSATION_QUALITY: 0.75,  # 75%
+            PerformanceMetric.PARTNERSHIP_MATCH: 0.8,  # 80%
+        }
+    
+    async def start_monitoring(self):
+        """Start the performance monitoring process."""
+        while True:
+            try:
+                await self._analyze_performance()
+                await asyncio.sleep(self.analysis_interval)
+            except Exception as e:
+                logger.error(f"Error in monitoring loop: {e}")
+                await asyncio.sleep(60)
+    
+    def record_metric(self, snapshot: MetricSnapshot):
+        """Record a performance metric snapshot."""
         try:
-            # Gather metrics concurrently
-            metrics_tasks = [
-                self._measure_response_time(),
-                self._calculate_accuracy(),
-                self._get_user_satisfaction(),
-                self._calculate_error_rate(),
-                self._get_resource_usage()
+            self.performance_history[snapshot.metric_type].append(snapshot)
+            
+            # Check for immediate action if metric is significantly below threshold
+            threshold = self.thresholds[snapshot.metric_type]
+            if snapshot.value < threshold * 0.7:  # 30% below threshold
+                self._trigger_immediate_action(snapshot)
+            
+        except Exception as e:
+            logger.error(f"Error recording metric: {e}")
+    
+    def record_decision(self, decision: DecisionOutcome):
+        """Record a decision outcome for analysis."""
+        try:
+            self.decision_history.append(decision)
+            
+            # Analyze recent similar decisions
+            similar_decisions = [
+                d for d in self.decision_history[-100:]
+                if d.decision_type == decision.decision_type
             ]
             
-            results = await asyncio.gather(*metrics_tasks)
+            if len(similar_decisions) >= 10:
+                self._analyze_decision_pattern(similar_decisions)
             
-            metrics = SystemMetrics(
-                response_time=results[0],
-                accuracy=results[1],
-                user_satisfaction=results[2],
-                error_rate=results[3],
-                resource_usage=results[4]
+        except Exception as e:
+            logger.error(f"Error recording decision: {e}")
+    
+    async def _analyze_performance(self):
+        """Analyze performance metrics and trigger improvements."""
+        try:
+            current_time = datetime.now()
+            
+            # Only analyze if enough time has passed
+            if (current_time - self.last_analysis).seconds < self.analysis_interval:
+                return
+            
+            for metric_type in PerformanceMetric:
+                metrics = list(self.performance_history[metric_type])
+                if not metrics:
+                    continue
+                
+                # Calculate key statistics
+                values = [m.value for m in metrics]
+                avg_value = np.mean(values)
+                trend = self._calculate_trend(values)
+                
+                # Check against threshold
+                threshold = self.thresholds[metric_type]
+                if avg_value < threshold or trend < -0.1:  # Negative trend
+                    self._create_improvement_action(
+                        metric_type,
+                        avg_value,
+                        trend,
+                        [m.context for m in metrics]
+                    )
+            
+            self.last_analysis = current_time
+            
+        except Exception as e:
+            logger.error(f"Error analyzing performance: {e}")
+    
+    def _calculate_trend(self, values: List[float]) -> float:
+        """Calculate the trend in a series of values."""
+        try:
+            if len(values) < 2:
+                return 0.0
+            
+            # Use simple linear regression
+            x = np.arange(len(values))
+            y = np.array(values)
+            
+            slope = np.polyfit(x, y, 1)[0]
+            return slope
+            
+        except Exception as e:
+            logger.error(f"Error calculating trend: {e}")
+            return 0.0
+    
+    def _analyze_decision_pattern(self, decisions: List[DecisionOutcome]):
+        """Analyze patterns in similar decisions."""
+        try:
+            # Group by outcome success
+            successful = [d for d in decisions if d.outcome and d.outcome.get('success', False)]
+            success_rate = len(successful) / len(decisions)
+            
+            # Analyze context patterns in successful decisions
+            if successful:
+                common_factors = self._extract_common_factors(
+                    [d.context for d in successful]
+                )
+                
+                if common_factors:
+                    self._create_improvement_action(
+                        'decision_pattern',
+                        success_rate,
+                        0.0,  # No trend for patterns
+                        {'common_factors': common_factors}
+                    )
+            
+        except Exception as e:
+            logger.error(f"Error analyzing decision pattern: {e}")
+    
+    def _extract_common_factors(self, contexts: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Extract common factors from successful decision contexts."""
+        try:
+            common_factors = {}
+            
+            # Find common keys first
+            common_keys = set.intersection(*[set(ctx.keys()) for ctx in contexts])
+            
+            for key in common_keys:
+                values = [ctx[key] for ctx in contexts]
+                
+                # For numeric values, find ranges
+                if all(isinstance(v, (int, float)) for v in values):
+                    common_factors[key] = {
+                        'min': min(values),
+                        'max': max(values),
+                        'mean': sum(values) / len(values)
+                    }
+                # For strings/enums, find most common
+                elif all(isinstance(v, str) for v in values):
+                    from collections import Counter
+                    counter = Counter(values)
+                    most_common = counter.most_common(1)[0]
+                    if most_common[1] >= len(values) * 0.7:  # 70% threshold
+                        common_factors[key] = most_common[0]
+            
+            return common_factors
+            
+        except Exception as e:
+            logger.error(f"Error extracting common factors: {e}")
+            return {}
+    
+    def _create_improvement_action(
+        self,
+        source_type: str,
+        current_value: float,
+        trend: float,
+        context: Dict[str, Any]
+    ):
+        """Create an improvement action based on analysis."""
+        try:
+            if source_type == 'decision_pattern':
+                action = ImprovementAction(
+                    action_type='update_decision_weights',
+                    target_module='business_intelligence',
+                    parameters={
+                        'success_patterns': context['common_factors'],
+                        'current_success_rate': current_value
+                    },
+                    reason=f"Identified successful decision patterns with {current_value:.1%} success rate",
+                    priority=3,
+                    timestamp=datetime.now()
+                )
+            else:
+                metric_type = PerformanceMetric(source_type)
+                threshold = self.thresholds[metric_type]
+                
+                action = ImprovementAction(
+                    action_type='optimize_performance',
+                    target_module=self._get_target_module(metric_type),
+                    parameters={
+                        'metric': metric_type.value,
+                        'current_value': current_value,
+                        'target_value': threshold,
+                        'trend': trend
+                    },
+                    reason=f"Performance below threshold: {current_value:.2f} vs {threshold:.2f}",
+                    priority=4 if current_value < threshold * 0.7 else 2,
+                    timestamp=datetime.now()
+                )
+            
+            self.improvement_queue.append(action)
+            
+        except Exception as e:
+            logger.error(f"Error creating improvement action: {e}")
+    
+    def _get_target_module(self, metric_type: PerformanceMetric) -> str:
+        """Map metric types to target modules."""
+        mapping = {
+            PerformanceMetric.API_LATENCY: 'api_client',
+            PerformanceMetric.RESEARCH_ACCURACY: 'business_intelligence',
+            PerformanceMetric.ALERT_RELEVANCE: 'business_intelligence',
+            PerformanceMetric.CONVERSATION_QUALITY: 'dialogue_manager',
+            PerformanceMetric.PARTNERSHIP_MATCH: 'business_intelligence'
+        }
+        return mapping.get(metric_type, 'unknown')
+    
+    def _trigger_immediate_action(self, snapshot: MetricSnapshot):
+        """Trigger immediate action for severely degraded performance."""
+        try:
+            action = ImprovementAction(
+                action_type='emergency_optimization',
+                target_module=self._get_target_module(snapshot.metric_type),
+                parameters={
+                    'metric': snapshot.metric_type.value,
+                    'current_value': snapshot.value,
+                    'threshold': self.thresholds[snapshot.metric_type],
+                    'context': snapshot.context
+                },
+                reason=f"Severe performance degradation: {snapshot.value:.2f}",
+                priority=5,  # Highest priority
+                timestamp=datetime.now()
             )
             
-            # Determine performance level
-            metrics.performance_level = self._determine_performance_level(metrics)
+            # Insert at the beginning of the queue
+            self.improvement_queue.insert(0, action)
             
-            # Update history
-            self.metrics_history.append(metrics)
-            if len(self.metrics_history) > self.max_history_size:
-                self.metrics_history.pop(0)
-            
-            return metrics
+            logger.warning(
+                f"Triggered immediate action for {snapshot.metric_type.value}: "
+                f"value={snapshot.value:.2f}, threshold={self.thresholds[snapshot.metric_type]:.2f}"
+            )
             
         except Exception as e:
-            self.logger.error(f"Error gathering metrics: {str(e)}")
-            raise RuntimeError(f"Failed to gather system metrics: {str(e)}")
+            logger.error(f"Error triggering immediate action: {e}")
     
-    async def evaluate_performance(self) -> Dict[str, float]:
-        """
-        Evaluate system performance using chain-of-thought reasoning.
-        
-        Returns:
-            Dictionary containing performance evaluation results
-            
-        Raises:
-            RuntimeError: If evaluation fails
-        """
+    async def get_pending_improvements(self) -> List[ImprovementAction]:
+        """Get pending improvement actions."""
         try:
-            # Check if enough time has passed since last evaluation
-            if (datetime.now() - self._last_evaluation).total_seconds() < self.evaluation_interval:
-                return self._cached_evaluation
+            # Sort by priority (highest first) and timestamp (newest first)
+            sorted_actions = sorted(
+                self.improvement_queue,
+                key=lambda x: (-x.priority, -x.timestamp.timestamp())
+            )
             
-            # Get recent metrics
-            recent_metrics = self.metrics_history[-10:] if self.metrics_history else []
+            # Clear the queue
+            self.improvement_queue = []
             
-            # Analyze trends
-            trends = self._analyze_trends(recent_metrics)
-            
-            # Evaluate decision outcomes
-            decisions = await self._evaluate_decisions()
-            
-            # Generate performance score
-            performance_score = self._calculate_performance_score(trends, decisions)
-            
-            evaluation = {
-                "overall_score": performance_score,
-                "trends": trends,
-                "decision_quality": decisions,
-                "timestamp": datetime.now().isoformat()
-            }
-            
-            # Cache the evaluation
-            self._cached_evaluation = evaluation
-            self._last_evaluation = datetime.now()
-            
-            return evaluation
+            return sorted_actions
             
         except Exception as e:
-            self.logger.error(f"Error evaluating performance: {str(e)}")
-            raise RuntimeError(f"Failed to evaluate system performance: {str(e)}")
-    
-    async def trigger_improvement(self) -> bool:
-        """
-        Trigger self-improvement routines if needed.
-        
-        Returns:
-            True if improvements were successfully applied, False otherwise
-            
-        Raises:
-            RuntimeError: If improvement process fails
-        """
-        async with self._improvement_lock:
-            try:
-                # Evaluate current performance
-                evaluation = await self.evaluate_performance()
-                
-                if evaluation["overall_score"] < self.improvement_threshold:
-                    # Identify areas for improvement
-                    improvement_areas = self._identify_improvement_areas(evaluation)
-                    
-                    # Generate improvement plan
-                    improvement_plan = await self._generate_improvement_plan(improvement_areas)
-                    
-                    # Execute improvements
-                    success = await self._execute_improvements(improvement_plan)
-                    
-                    if success:
-                        self.logger.info("Successfully completed self-improvement routine")
-                        return True
-                    else:
-                        self.logger.warning("Self-improvement routine completed with issues")
-                        return False
-                else:
-                    self.logger.info("System performance meets threshold, no improvements needed")
-                    return False
-                    
-            except Exception as e:
-                self.logger.error(f"Error triggering improvement: {str(e)}")
-                raise RuntimeError(f"Failed to trigger system improvements: {str(e)}")
-    
-    def _determine_performance_level(self, metrics: SystemMetrics) -> PerformanceLevel:
-        """Determine the performance level based on metrics."""
-        overall_score = (
-            (1 - metrics.error_rate) * 0.4 +
-            metrics.accuracy * 0.3 +
-            metrics.user_satisfaction * 0.3
-        )
-        
-        if overall_score <= PerformanceLevel.CRITICAL.value:
-            return PerformanceLevel.CRITICAL
-        elif overall_score <= PerformanceLevel.WARNING.value:
-            return PerformanceLevel.WARNING
-        elif overall_score <= PerformanceLevel.OPTIMAL.value:
-            return PerformanceLevel.OPTIMAL
-        else:
-            return PerformanceLevel.EXCELLENT
-    
-    async def _measure_response_time(self) -> float:
-        """Measure average system response time."""
-        try:
-            # Implementation for response time measurement
-            return 0.0
-        except Exception as e:
-            self.logger.error(f"Error measuring response time: {str(e)}")
-            return float('inf')
-    
-    async def _calculate_accuracy(self) -> float:
-        """Calculate system accuracy based on intent recognition and task completion."""
-        try:
-            # Implementation for accuracy calculation
-            return 0.0
-        except Exception as e:
-            self.logger.error(f"Error calculating accuracy: {str(e)}")
-            return 0.0
-    
-    async def _get_user_satisfaction(self) -> float:
-        """Get user satisfaction score from feedback and interactions."""
-        try:
-            # Implementation for user satisfaction calculation
-            return 0.0
-        except Exception as e:
-            self.logger.error(f"Error getting user satisfaction: {str(e)}")
-            return 0.0
-    
-    async def _calculate_error_rate(self) -> float:
-        """Calculate system error rate from logs and metrics."""
-        try:
-            # Implementation for error rate calculation
-            return 0.0
-        except Exception as e:
-            self.logger.error(f"Error calculating error rate: {str(e)}")
-            return 1.0
-    
-    async def _get_resource_usage(self) -> Dict[str, float]:
-        """Get current system resource usage metrics."""
-        try:
-            # Implementation for resource usage measurement
-            return {}
-        except Exception as e:
-            self.logger.error(f"Error getting resource usage: {str(e)}")
-            return {"cpu": 1.0, "memory": 1.0}
-    
-    def _analyze_trends(self, metrics: List[SystemMetrics]) -> Dict[str, float]:
-        """Analyze performance trends from historical metrics."""
-        try:
-            if not metrics:
-                return {}
-            
-            trends = {}
-            for metric in ["response_time", "accuracy", "user_satisfaction", "error_rate"]:
-                values = [getattr(m, metric) for m in metrics]
-                if values:
-                    trends[metric] = sum(values) / len(values)
-            
-            return trends
-        except Exception as e:
-            self.logger.error(f"Error analyzing trends: {str(e)}")
-            return {}
-    
-    async def _evaluate_decisions(self) -> float:
-        """Evaluate the quality of system decisions."""
-        try:
-            # Implementation for decision evaluation
-            return 0.0
-        except Exception as e:
-            self.logger.error(f"Error evaluating decisions: {str(e)}")
-            return 0.0
-    
-    def _calculate_performance_score(self, trends: Dict[str, float], decisions: float) -> float:
-        """Calculate overall system performance score."""
-        try:
-            if not trends:
-                return decisions
-            
-            weights = {
-                "response_time": 0.2,
-                "accuracy": 0.3,
-                "user_satisfaction": 0.2,
-                "error_rate": 0.2,
-                "decisions": 0.1
-            }
-            
-            score = 0.0
-            for metric, weight in weights.items():
-                if metric == "decisions":
-                    score += decisions * weight
-                elif metric in trends:
-                    value = trends[metric]
-                    if metric == "response_time":
-                        # Lower is better
-                        value = 1.0 - min(value / 5.0, 1.0)
-                    elif metric == "error_rate":
-                        # Lower is better
-                        value = 1.0 - value
-                    score += value * weight
-            
-            return max(0.0, min(1.0, score))
-        except Exception as e:
-            self.logger.error(f"Error calculating performance score: {str(e)}")
-            return 0.0
-    
-    def _identify_improvement_areas(self, evaluation: Dict[str, float]) -> List[ImprovementArea]:
-        """Identify areas that need improvement based on evaluation."""
-        try:
-            areas = []
-            
-            # Check response time
-            if evaluation["trends"].get("response_time", 0) > 2.0:
-                areas.append(ImprovementArea(
-                    name="response_time",
-                    current_score=1.0 - (evaluation["trends"]["response_time"] / 5.0),
-                    target_score=0.8,
-                    priority=1,
-                    impact=0.3,
-                    description="System response time is too high"
-                ))
-            
-            # Check accuracy
-            if evaluation["trends"].get("accuracy", 0) < 0.7:
-                areas.append(ImprovementArea(
-                    name="accuracy",
-                    current_score=evaluation["trends"]["accuracy"],
-                    target_score=0.8,
-                    priority=2,
-                    impact=0.4,
-                    description="System accuracy needs improvement"
-                ))
-            
-            # Check user satisfaction
-            if evaluation["trends"].get("user_satisfaction", 0) < 0.6:
-                areas.append(ImprovementArea(
-                    name="user_satisfaction",
-                    current_score=evaluation["trends"]["user_satisfaction"],
-                    target_score=0.7,
-                    priority=3,
-                    impact=0.3,
-                    description="User satisfaction is below target"
-                ))
-            
-            return sorted(areas, key=lambda x: (x.priority, x.impact), reverse=True)
-        except Exception as e:
-            self.logger.error(f"Error identifying improvement areas: {str(e)}")
-            return []
-    
-    async def _generate_improvement_plan(self, areas: List[ImprovementArea]) -> Dict[str, str]:
-        """Generate a plan for system improvements."""
-        try:
-            plan = {}
-            for area in areas:
-                plan[area.name] = self._get_improvement_strategy(area)
-            return plan
-        except Exception as e:
-            self.logger.error(f"Error generating improvement plan: {str(e)}")
-            return {}
-    
-    def _get_improvement_strategy(self, area: ImprovementArea) -> str:
-        """Get improvement strategy for a specific area."""
-        strategies = {
-            "response_time": "Optimize processing pipeline and implement caching",
-            "accuracy": "Update intent recognition model and improve entity extraction",
-            "user_satisfaction": "Enhance response quality and add more interactive features"
-        }
-        return strategies.get(area.name, "General system optimization")
-    
-    async def _execute_improvements(self, plan: Dict[str, str]) -> bool:
-        """Execute the improvement plan."""
-        try:
-            success = True
-            for area, strategy in plan.items():
-                try:
-                    # Implementation for executing improvements
-                    self.logger.info(f"Executing improvement for {area}: {strategy}")
-                except Exception as e:
-                    self.logger.error(f"Error executing improvement for {area}: {str(e)}")
-                    success = False
-            
-            return success
-        except Exception as e:
-            self.logger.error(f"Error executing improvements: {str(e)}")
-            return False 
+            logger.error(f"Error getting pending improvements: {e}")
+            return [] 

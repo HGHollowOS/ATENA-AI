@@ -8,6 +8,7 @@ ATENA-AI is an advanced business intelligence and automation platform that suppo
 - **Natural Discord Interaction**: Intuitive slash commands for business operations
 - **Self-Improvement Systems**: Continuous learning and optimization capabilities
 - **Business Workflow Automation**: Streamlined processes for common business tasks
+- **Comprehensive Test Coverage**: Robust test suite with async support and integration tests
 
 ## Discord Commands
 
@@ -117,22 +118,37 @@ ATENA-AI/
 │   │   └── bot.py
 │   ├── meta_agent/
 │   │   └── meta_agent.py
+│   ├── integrations/
+│   │   └── news.py
 │   └── main.py
 ├── tests/
 │   ├── discord_bot/
 │   │   └── test_commands.py
+│   ├── integrations/
+│   │   └── test_news.py
 │   └── meta_agent/
-│       └── test_integration.py
+│       ├── test_meta_agent.py
+│       ├── test_integration.py
+│       └── test_self_improvement.py
+├── pytest.ini
 ├── requirements.txt
 └── README.md
 ```
 
 ## Testing
 
-Run the test suite:
+The project includes a comprehensive test suite with async support. Run the tests with:
+
 ```bash
-pytest tests/
+python -m pytest tests/ -v
 ```
+
+Key testing features:
+- Async test support with pytest-asyncio
+- Integration tests for all major components
+- Unit tests for individual modules
+- Performance monitoring tests
+- Self-improvement system tests
 
 ## Contributing
 
@@ -171,6 +187,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - 🛡️ **Secure**: Enterprise-grade security for sensitive business data
 - 🔌 **Extensible**: Easy integration with existing business tools
 - 📊 **Data Visualization**: Clear and actionable insights presentation
+- ✅ **Comprehensive Testing**: Robust test suite with async support
 
 ## 🚀 Getting Started
 
@@ -251,10 +268,10 @@ Analyze business metrics over time.
 ```
 /report [type] [timeframe]
 ```
-Generate detailed business reports.
+Generate comprehensive business reports.
 - **Type**: performance, market, competitor
 - **Timeframe**: 1d, 1w, 1m
-- **Example**: `/report type:"market" timeframe:"1w"`
+- **Example**: `/report type:"Performance" timeframe:"1w"`
 
 #### Help Command
 ```

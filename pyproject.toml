@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atena-ai"
+version = "0.1.0"
+authors = [
+  { name="ATENA AI Team" },
+]
+description = "AI-powered Discord bot for business intelligence"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "discord.py",
+    "openai",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "tiktoken"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+namespaces = false
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "."
+] 

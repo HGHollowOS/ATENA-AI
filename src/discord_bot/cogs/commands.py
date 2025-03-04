@@ -1,80 +1,100 @@
 """
-Discord commands cog for ATENA-AI.
-Provides business-focused commands and interactions.
+Business-focused Discord commands for ATENA-AI.
 """
 
 import discord
-from discord.ext import commands
 from discord import app_commands
+from discord.ext import commands
+from typing import Literal, Optional
 import logging
-from typing import Optional
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 class BusinessCommands(commands.Cog):
-    """Business-focused commands for ATENA-AI."""
+    """Business intelligence and research commands."""
     
     def __init__(self, bot):
         self.bot = bot
         
-    @app_commands.command(
-        name="research",
-        description="Research a company or industry"
+    @commands.command(name="help")
+    async def help_command(self, ctx):
+        """Display help information for ATENA-AI commands."""
+        embed = discord.Embed(
+            title="ATENA-AI Command Help",
+            description="Here are the available commands:",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(
+            name="/research [topic] [depth]",
+            value="Research a company or industry. Depth can be 'quick', 'medium', or 'deep'.",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="/monitor [target] [metric] [threshold]",
+            value="Set up monitoring for business metrics with alerts.",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="/analyze [metric] [timeframe]",
+            value="Analyze business performance metrics. Timeframe examples: '1d', '1w', '1m'.",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="/report [type] [timeframe]",
+            value="Generate business intelligence reports. Types: 'performance', 'market', 'competitor'.",
+            inline=False
+        )
+        
+        await ctx.send(embed=embed)
+
+    @app_commands.command(name="research")
+    @app_commands.describe(
+        topic="Company or industry to research",
+        depth="Depth of research (quick/medium/deep)"
     )
     async def research(
         self,
         interaction: discord.Interaction,
         topic: str,
-        depth: Optional[str] = "medium"
+        depth: Literal["quick", "medium", "deep"] = "medium"
     ):
-        """
-        Conduct business research on a company or industry.
-        
-        Parameters:
-        -----------
-        topic : str
-            The company or industry to research
-        depth : str, optional
-            Research depth: "quick", "medium", or "deep"
-        """
+        """Research a company or industry."""
+        if len(topic) < 2:
+            await interaction.response.send_message("Topic must be at least 2 characters long.", ephemeral=True)
+            return
+            
         await interaction.response.defer()
         
         try:
-            # Create research embed
+            result = await self.bot.business_intelligence.research(topic, depth)
+            
             embed = discord.Embed(
-                title=f"Business Research: {topic}",
-                description="Analyzing market data and trends...",
-                color=discord.Color.blue(),
-                timestamp=datetime.now()
+                title=f"Research Results: {topic}",
+                description=result['summary'],
+                color=discord.Color.green()
             )
-            embed.add_field(name="Status", value="🔍 Researching...", inline=False)
             
-            message = await interaction.followup.send(embed=embed)
-            
-            # Simulate research process
-            research_result = await self.bot.business_intelligence.research(topic, depth)
-            
-            # Update embed with results
-            embed.description = research_result['summary']
-            embed.clear_fields()
-            
-            for key, value in research_result['details'].items():
-                embed.add_field(name=key, value=value, inline=False)
+            for key, value in result['details'].items():
+                embed.add_field(name=key, value=value, inline=True)
                 
-            embed.set_footer(text=f"Research depth: {depth}")
-            await message.edit(embed=embed)
+            await interaction.followup.send(embed=embed)
             
         except Exception as e:
-            logger.error(f"Error in research command: {e}")
+            logger.error(f"Error in research command: {str(e)}")
             await interaction.followup.send(
-                "An error occurred while conducting research. Please try again later.",
+                "An error occurred while processing your request. Please try again later.",
                 ephemeral=True
             )
 
-    @app_commands.command(
-        name="monitor",
-        description="Set up business monitoring alerts"
+    @app_commands.command(name="monitor")
+    @app_commands.describe(
+        target="Metric target to monitor",
+        metric="Type of metric",
+        threshold="Alert threshold value"
     )
     async def monitor(
         self,
@@ -83,198 +103,128 @@ class BusinessCommands(commands.Cog):
         metric: str,
         threshold: float
     ):
-        """
-        Set up monitoring for business metrics.
-        
-        Parameters:
-        -----------
-        target : str
-            The company or metric to monitor
-        metric : str
-            The specific metric to track
-        threshold : float
-            Alert threshold value
-        """
+        """Set up business monitoring alerts."""
+        if len(target) < 2:
+            await interaction.response.send_message("Target must be at least 2 characters long.", ephemeral=True)
+            return
+            
+        if len(metric) < 2:
+            await interaction.response.send_message("Metric must be at least 2 characters long.", ephemeral=True)
+            return
+            
+        if threshold < 0:
+            await interaction.response.send_message("Threshold must be a positive number.", ephemeral=True)
+            return
+            
         await interaction.response.defer()
         
         try:
-            # Create monitor embed
+            result = await self.bot.business_intelligence.setup_monitor(target, metric, threshold)
+            
             embed = discord.Embed(
-                title=f"Business Monitor: {target}",
-                description=f"Setting up monitoring for {metric}",
-                color=discord.Color.green(),
-                timestamp=datetime.now()
+                title="Monitor Setup Complete",
+                description=f"Monitoring configured for {target}",
+                color=discord.Color.green()
             )
             
-            # Set up monitoring
-            monitor_config = await self.bot.business_intelligence.setup_monitor(
-                target, metric, threshold
-            )
-            
-            embed.add_field(
-                name="Status",
-                value="✅ Monitor configured successfully",
-                inline=False
-            )
-            embed.add_field(
-                name="Target",
-                value=target,
-                inline=True
-            )
-            embed.add_field(
-                name="Metric",
-                value=metric,
-                inline=True
-            )
-            embed.add_field(
-                name="Threshold",
-                value=str(threshold),
-                inline=True
-            )
+            embed.add_field(name="Monitor ID", value=result['id'])
+            embed.add_field(name="Status", value=result['status'])
             
             await interaction.followup.send(embed=embed)
             
         except Exception as e:
-            logger.error(f"Error in monitor command: {e}")
+            logger.error(f"Error in monitor command: {str(e)}")
             await interaction.followup.send(
                 "An error occurred while setting up the monitor. Please try again later.",
                 ephemeral=True
             )
 
-    @app_commands.command(
-        name="analyze",
-        description="Analyze business performance metrics"
+    @app_commands.command(name="analyze")
+    @app_commands.describe(
+        metric="Metric to analyze",
+        timeframe="Analysis timeframe (1d/1w/1m)"
     )
     async def analyze(
         self,
         interaction: discord.Interaction,
         metric: str,
-        timeframe: Optional[str] = "1d"
+        timeframe: Literal["1d", "1w", "1m"] = "1d"
     ):
-        """
-        Analyze business performance metrics.
-        
-        Parameters:
-        -----------
-        metric : str
-            The metric to analyze
-        timeframe : str, optional
-            Time period: "1h", "1d", "1w", "1m"
-        """
+        """Analyze business performance metrics."""
+        if len(metric) < 2:
+            await interaction.response.send_message("Metric must be at least 2 characters long.", ephemeral=True)
+            return
+            
         await interaction.response.defer()
         
         try:
-            # Create analysis embed
+            result = await self.bot.business_intelligence.analyze_metric(metric, timeframe)
+            
             embed = discord.Embed(
-                title=f"Performance Analysis: {metric}",
-                description=f"Analyzing data for the past {timeframe}",
-                color=discord.Color.gold(),
-                timestamp=datetime.now()
+                title=f"Analysis: {metric}",
+                description=result['summary'],
+                color=discord.Color.blue()
             )
             
-            message = await interaction.followup.send(embed=embed)
+            embed.add_field(name="Current Value", value=str(result['current']))
+            embed.add_field(name="Trend", value=result['trend'])
             
-            # Perform analysis
-            analysis = await self.bot.business_intelligence.analyze_metric(
-                metric, timeframe
-            )
-            
-            # Update embed with results
-            embed.description = analysis['summary']
-            
-            embed.add_field(
-                name="Current Value",
-                value=str(analysis['current']),
-                inline=True
-            )
-            embed.add_field(
-                name="Trend",
-                value=analysis['trend'],
-                inline=True
-            )
-            embed.add_field(
-                name="Change",
-                value=analysis['change'],
-                inline=True
-            )
-            
-            if 'recommendations' in analysis:
-                embed.add_field(
-                    name="Recommendations",
-                    value=analysis['recommendations'],
-                    inline=False
-                )
-            
-            await message.edit(embed=embed)
+            await interaction.followup.send(embed=embed)
             
         except Exception as e:
-            logger.error(f"Error in analyze command: {e}")
+            logger.error(f"Error in analyze command: {str(e)}")
             await interaction.followup.send(
-                "An error occurred during analysis. Please try again later.",
+                "An error occurred while analyzing the metric. Please try again later.",
                 ephemeral=True
             )
 
-    @app_commands.command(
-        name="report",
-        description="Generate a business intelligence report"
+    @app_commands.command(name="report")
+    @app_commands.describe(
+        report_type="Type of report to generate",
+        timeframe="Report timeframe (1d/1w/1m)"
     )
     async def report(
         self,
         interaction: discord.Interaction,
-        report_type: str,
-        timeframe: Optional[str] = "1w"
+        report_type: Literal["performance", "market", "competitor"],
+        timeframe: Literal["1d", "1w", "1m"] = "1w"
     ):
-        """
-        Generate a business intelligence report.
-        
-        Parameters:
-        -----------
-        report_type : str
-            Type of report to generate
-        timeframe : str, optional
-            Time period to cover: "1d", "1w", "1m", "3m"
-        """
+        """Generate a business intelligence report."""
         await interaction.response.defer()
         
         try:
-            # Create report embed
+            result = await self.bot.business_intelligence.generate_report(report_type, timeframe)
+            
             embed = discord.Embed(
-                title=f"Business Report: {report_type}",
-                description=f"Generating report for {timeframe}",
-                color=discord.Color.purple(),
-                timestamp=datetime.now()
+                title=f"{report_type.title()} Report",
+                description=result['summary'],
+                color=discord.Color.gold()
             )
             
-            message = await interaction.followup.send(embed=embed)
+            for section in result['sections']:
+                if isinstance(section, dict) and 'title' in section and 'content' in section:
+                    embed.add_field(
+                        name=section['title'],
+                        value=section['content'],
+                        inline=False
+                    )
             
-            # Generate report
-            report = await self.bot.business_intelligence.generate_report(
-                report_type, timeframe
-            )
-            
-            # Update embed with report
-            embed.description = report['summary']
-            
-            for section in report['sections']:
-                embed.add_field(
-                    name=section['title'],
-                    value=section['content'],
-                    inline=False
-                )
-            
-            # Add report metadata
-            embed.set_footer(
-                text=f"Report generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            )
-            
-            await message.edit(embed=embed)
+            await interaction.followup.send(embed=embed)
             
         except Exception as e:
-            logger.error(f"Error in report command: {e}")
+            logger.error(f"Error in report command: {str(e)}")
             await interaction.followup.send(
                 "An error occurred while generating the report. Please try again later.",
                 ephemeral=True
             )
+
+    async def on_command_error(self, ctx, error):
+        """Handle command errors."""
+        if isinstance(error, commands.CommandNotFound):
+            await ctx.send("Command not found. Use !atena help to see available commands.")
+        else:
+            logger.error(f"Command error: {str(error)}")
+            await ctx.send("An error occurred while processing your command. Please try again later.")
 
 async def setup(bot):
     """Add the cog to the bot."""

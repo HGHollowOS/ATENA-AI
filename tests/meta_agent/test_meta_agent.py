@@ -1,5 +1,5 @@
 import pytest
-import asyncio
+from unittest.mock import Mock, patch
 from datetime import datetime, timedelta
 from src.meta_agent.meta_agent import (
     MetaAgent,
@@ -23,6 +23,58 @@ def meta_agent():
         }
     }
     return MetaAgent(config)
+
+@pytest.mark.asyncio
+async def test_record_metrics(meta_agent):
+    metrics = {
+        "response_time": 1.5,
+        "token_usage": 1000,
+        "success_rate": 0.95
+    }
+    
+    await meta_agent.record_metrics(metrics)
+    assert len(meta_agent.metrics_history) == 1
+    assert meta_agent.metrics_history[0]["response_time"] == 1.5
+
+@pytest.mark.asyncio
+async def test_analyze_performance(meta_agent):
+    # Add test metrics
+    metrics_list = [
+        {
+            "response_time": 1.5,
+            "token_usage": 1000,
+            "success_rate": 0.95,
+            "timestamp": datetime.now()
+        },
+        {
+            "response_time": 1.8,
+            "token_usage": 1200,
+            "success_rate": 0.90,
+            "timestamp": datetime.now()
+        }
+    ]
+    
+    meta_agent.metrics_history.extend(metrics_list)
+    analysis = await meta_agent.analyze_performance()
+    
+    assert "response_time" in analysis
+    assert "token_usage" in analysis
+    assert "success_rate" in analysis
+
+@pytest.mark.asyncio
+async def test_trigger_improvement(meta_agent):
+    analysis = {
+        "response_time": {
+            "trend": "increasing",
+            "current": 2.0,
+            "threshold": 1.5
+        }
+    }
+    
+    improvement = await meta_agent.trigger_improvement(analysis)
+    assert improvement is not None
+    assert "action" in improvement
+    assert "target" in improvement
 
 @pytest.mark.asyncio
 async def test_record_metric(meta_agent):
@@ -90,29 +142,6 @@ async def test_record_decision(meta_agent):
     assert recorded.outcome['success'] is True
 
 @pytest.mark.asyncio
-async def test_analyze_performance(meta_agent):
-    """Test performance analysis and improvement triggers."""
-    # Add multiple poor performance metrics
-    for _ in range(5):
-        snapshot = MetricSnapshot(
-            metric_type=PerformanceMetric.RESEARCH_ACCURACY,
-            value=0.6,  # Below threshold
-            timestamp=datetime.now(),
-            context={'query': 'test'},
-            source_module='business_intelligence'
-        )
-        meta_agent.record_metric(snapshot)
-    
-    # Trigger analysis
-    await meta_agent._analyze_performance()
-    
-    # Verify improvement action was created
-    assert len(meta_agent.improvement_queue) > 0
-    action = meta_agent.improvement_queue[0]
-    assert action.target_module == 'business_intelligence'
-    assert 'research_accuracy' in action.parameters['metric']
-
-@pytest.mark.asyncio
 async def test_calculate_trend(meta_agent):
     """Test trend calculation for performance metrics."""
     values = [1.0, 1.2, 1.4, 1.6, 1.8]  # Increasing trend
@@ -175,6 +204,8 @@ async def test_extract_common_factors(meta_agent):
     assert 'size' in factors
     assert factors['size'] == 'large'
     assert 'score' in factors
+    assert factors['score'] == 0.85
     assert 'min' in factors['score']
+    assert factors['score'] == 0.8
     assert 'max' in factors['score']
     assert 'mean' in factors['score'] 

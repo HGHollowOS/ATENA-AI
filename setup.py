@@ -11,16 +11,15 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
 setup(
-    name="atenai",
+    name="atena-ai",
     version="0.1.0",
     author="ATENAAI Team",
-    author_email="team@atenai.com",
+    author_email="giovannicallebaut@spaceatena.com",
     description="A comprehensive error handling system with retry mechanisms and circuit breakers",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/HGHollowOS/ATENA-AI",
-    packages=find_packages(where="src"),
-    package_dir={"": "src"},
+    packages=find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
@@ -35,7 +34,14 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     python_requires=">=3.8",
-    install_requires=requirements,
+    install_requires=[
+        "openai",
+        "discord.py",
+        "tiktoken",
+        "pytest",
+        "pytest-asyncio",
+        "pytest-cov"
+    ],
     entry_points={
         "console_scripts": [
             "atenai=atenai.cli:main",

@@ -1,56 +1,80 @@
 # ATENA-AI
 
-ATENA-AI is an advanced AI-powered Discord bot designed to support company tasks through natural conversation and autonomous business intelligence capabilities. It combines proactive monitoring, natural language processing, and self-improvement systems to provide valuable insights and automate business workflows.
+ATENA-AI is an advanced business intelligence and research assistant that leverages AI to help companies make data-driven decisions. Through natural conversation and autonomous research capabilities, ATENA-AI provides valuable insights and automates business workflows.
 
 ## Features
 
-### Core Capabilities
-- **Proactive Business Intelligence**: Monitors market trends, company performance, and industry developments in real-time
-- **Natural Discord Interaction**: Responds to both slash commands and natural language queries
-- **Self-Improvement System**: Continuously learns and adapts based on interactions and performance metrics
-- **Business Workflow Automation**: Streamlines common business tasks and research processes
+- 🤖 **Intelligent Business Research**: Conducts in-depth research on companies, industries, and market trends
+- 📊 **Performance Monitoring**: Tracks and analyzes business metrics in real-time
+- 📈 **Market Analysis**: Provides comprehensive market insights and competitor analysis
+- 🔄 **Self-Improvement**: Continuously learns and adapts to improve performance
+- 🤝 **Natural Interaction**: Communicates through Discord with natural language understanding
+- 📱 **Multi-Platform**: Accessible through Discord and other integration points
 
-### Command Reference
+## Discord Commands
 
-#### Slash Commands
-- `/research [topic] [depth]`
-  - Conducts in-depth research on companies or industries
-  - **Parameters**:
-    - `topic`: Company name or industry (min. 3 characters)
-    - `depth`: Research depth ("quick", "normal", "deep")
-  - **Example**: `/research topic:"Tesla" depth:"deep"`
+### Research Command
+Research companies or industries with varying levels of depth.
+```
+/research [topic] [depth]
+```
+- `topic`: Company or industry to research
+- `depth`: Research depth (quick/medium/deep)
 
-- `/monitor [target] [metric] [threshold]`
-  - Sets up monitoring for business metrics
-  - **Parameters**:
-    - `target`: Metric to monitor (e.g., "Market Share", "Revenue")
-    - `metric`: Type of measurement ("percentage", "value", "growth_rate")
-    - `threshold`: Alert threshold value
-  - **Example**: `/monitor target:"Revenue" metric:"growth_rate" threshold:10.0`
+Examples:
+```
+/research topic:"Tesla" depth:"deep"
+/research topic:"AI Industry" depth:"quick"
+```
 
-- `/analyze [metric] [timeframe]`
-  - Analyzes business performance metrics
-  - **Parameters**:
-    - `metric`: Metric to analyze
-    - `timeframe`: Analysis period ("1d", "1w", "1m", "3m", "1y")
-  - **Example**: `/analyze metric:"Profit Margin" timeframe:"1m"`
+### Monitor Command
+Set up monitoring for business metrics with customizable alerts.
+```
+/monitor [target] [metric] [threshold]
+```
+- `target`: Metric target to monitor
+- `metric`: Type of metric
+- `threshold`: Alert threshold value
 
-- `/report [report_type] [timeframe]`
-  - Generates business intelligence reports
-  - **Parameters**:
-    - `report_type`: Type of report ("performance", "market", "competitor", "trend")
-    - `timeframe`: Report period ("1w", "1m", "3m", "1y")
-  - **Example**: `/report report_type:"market" timeframe:"1m"`
+Examples:
+```
+/monitor target:"Market Share" metric:"percentage" threshold:75.0
+/monitor target:"Revenue" metric:"growth_rate" threshold:10.0
+```
 
-#### Text Commands
-- `!atena help`
-  - Displays comprehensive help information
-  - Lists all available commands and their usage
+### Analyze Command
+Analyze business performance metrics over time.
+```
+/analyze [metric] [timeframe]
+```
+- `metric`: Metric to analyze
+- `timeframe`: Analysis period (1d/1w/1m)
 
-- Natural Language Queries
-  - Example: "How is Tesla performing this quarter?"
-  - Example: "Monitor SpaceX's market share"
-  - Example: "Generate a competitor analysis report"
+Examples:
+```
+/analyze metric:"Profit Margin" timeframe:"1w"
+/analyze metric:"Customer Acquisition" timeframe:"1m"
+```
+
+### Report Command
+Generate comprehensive business intelligence reports.
+```
+/report [type] [timeframe]
+```
+- `type`: Report type (performance/market/competitor)
+- `timeframe`: Report period (1d/1w/1m)
+
+Examples:
+```
+/report type:"performance" timeframe:"1w"
+/report type:"market" timeframe:"1m"
+```
+
+### Help Command
+Display help information about available commands.
+```
+!atena help
+```
 
 ## Installation
 
@@ -67,9 +91,8 @@ pip install -r requirements.txt
 
 3. Set up environment variables:
 ```bash
-# Create .env file
-DISCORD_TOKEN=your_discord_token
-OPENAI_API_KEY=your_openai_api_key
+cp .env.example .env
+# Edit .env with your configuration
 ```
 
 4. Run the bot:
@@ -78,64 +101,46 @@ python src/main.py
 ```
 
 ## Project Structure
+
 ```
 ATENA-AI/
 ├── src/
-│   ├── business_intelligence/
-│   │   ├── business_intelligence.py
-│   │   └── market_analysis.py
-│   ├── discord_bot/
-│   │   ├── cogs/
-│   │   │   ├── commands.py
-│   │   │   └── business_intelligence.py
-│   │   └── bot.py
-│   ├── meta_agent/
-│   │   ├── meta_agent.py
-│   │   └── self_improvement.py
-│   └── main.py
-├── tests/
-│   ├── business_intelligence/
-│   ├── discord_bot/
-│   └── meta_agent/
-├── requirements.txt
-└── README.md
+│   ├── business_intelligence/    # Business logic and analysis
+│   ├── discord_bot/             # Discord bot implementation
+│   ├── meta_agent/              # Self-improvement system
+│   └── main.py                  # Application entry point
+├── tests/                       # Test suites
+├── requirements.txt             # Python dependencies
+└── README.md                    # Documentation
 ```
 
 ## Testing
 
 Run the test suite:
 ```bash
-python -m pytest tests/ -v
+python -m pytest tests/
 ```
 
-Run specific test categories:
+Run specific test modules:
 ```bash
-python -m pytest tests/business_intelligence/ -v
-python -m pytest tests/discord_bot/ -v
-python -m pytest tests/meta_agent/ -v
+python -m pytest tests/meta_agent/
+python -m pytest tests/discord_bot/
 ```
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-- OpenAI for GPT models
-- Discord.py team for the Discord API wrapper
-- All contributors who have helped shape ATENA-AI
-
-## Support
-
-For support, please:
-1. Check the [documentation](docs/)
-2. Open an issue
-3. Join our [Discord server](https://discord.gg/your-server) 
+- OpenAI for AI capabilities
+- Discord.py team for the Discord integration
+- All contributors who have helped shape ATENA-AI 

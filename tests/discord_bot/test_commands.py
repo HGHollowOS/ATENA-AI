@@ -1,12 +1,10 @@
 """
-Tests for the Discord business commands cog.
+Tests for Discord bot commands
 """
 
 import pytest
 import discord
 from discord.ext import commands
-import asyncio
-from datetime import datetime
 from src.discord_bot.cogs.commands import BusinessCommands
 
 class MockBot:
@@ -16,63 +14,47 @@ class MockBot:
 
 class MockBusinessIntelligence:
     """Mock business intelligence class for testing."""
-    async def research(self, topic: str, depth: str) -> dict:
+    async def research(self, topic: str, depth: str = "medium") -> dict:
         return {
             'summary': f'Research results for {topic}',
             'details': {
                 'Market Size': '$1B',
-                'Growth Rate': '10%',
-                'Key Players': 'Company A, Company B',
-                'Trends': 'AI, Cloud Computing'
+                'Growth Rate': '10%'
             }
         }
     
     async def setup_monitor(self, target: str, metric: str, threshold: float) -> dict:
         return {
             'id': 'mon_123',
-            'target': target,
-            'metric': metric,
-            'threshold': threshold,
             'status': 'active'
         }
     
-    async def analyze_metric(self, metric: str, timeframe: str) -> dict:
+    async def analyze_metric(self, metric: str, timeframe: str = "1d") -> dict:
         return {
-            'summary': f'Analysis of {metric} over {timeframe}',
+            'summary': f'Analysis of {metric}',
             'current': 100,
-            'trend': 'Increasing',
-            'change': '+5%',
-            'recommendations': 'Consider increasing investment'
+            'trend': 'up'
         }
     
-    async def generate_report(self, report_type: str, timeframe: str) -> dict:
+    async def generate_report(self, report_type: str, timeframe: str = "1w") -> dict:
         return {
-            'summary': f'{report_type} report for {timeframe}',
-            'sections': [
-                {
-                    'title': 'Performance Overview',
-                    'content': 'Strong performance across metrics'
-                },
-                {
-                    'title': 'Key Insights',
-                    'content': 'Market share growing'
-                }
-            ]
+            'summary': f'{report_type} report',
+            'sections': []
         }
 
 class MockInteraction:
-    """Mock Discord interaction for testing."""
+    """Mock Discord interaction."""
     def __init__(self):
         self.response = MockResponse()
         self.followup = MockFollowup()
 
 class MockResponse:
-    """Mock Discord interaction response."""
+    """Mock interaction response."""
     async def defer(self):
         pass
 
 class MockFollowup:
-    """Mock Discord interaction followup."""
+    """Mock interaction followup."""
     async def send(self, content=None, embed=None, ephemeral=False):
         return MockMessage()
 
@@ -82,7 +64,7 @@ class MockMessage:
         pass
 
 class MockContext:
-    """Mock Discord context for testing."""
+    """Mock Discord context."""
     async def send(self, content=None, embed=None):
         pass
 
@@ -109,58 +91,58 @@ def ctx():
 @pytest.mark.asyncio
 async def test_help_command(cog, ctx):
     """Test the help command."""
-    await cog.help_command(ctx)
+    await cog.help_command.callback(cog, ctx)
 
 @pytest.mark.asyncio
 async def test_research_command_validation(cog, interaction):
     """Test research command input validation."""
     # Test with invalid topic (too short)
-    await cog.research(interaction, topic="a")
+    await cog.research.callback(cog, interaction, topic="a")
     
     # Test with invalid depth
-    await cog.research(interaction, topic="AI Technology", depth="invalid")
+    await cog.research.callback(cog, interaction, topic="AI Technology", depth="invalid")
     
     # Test with valid inputs
-    await cog.research(interaction, topic="AI Technology", depth="deep")
+    await cog.research.callback(cog, interaction, topic="AI Technology", depth="deep")
 
 @pytest.mark.asyncio
 async def test_monitor_command_validation(cog, interaction):
     """Test monitor command input validation."""
     # Test with invalid target (too short)
-    await cog.monitor(interaction, target="a", metric="test", threshold=75.0)
+    await cog.monitor.callback(cog, interaction, target="a", metric="test", threshold=75.0)
     
     # Test with invalid metric (too short)
-    await cog.monitor(interaction, target="Market Share", metric="", threshold=75.0)
+    await cog.monitor.callback(cog, interaction, target="Market Share", metric="", threshold=75.0)
     
     # Test with invalid threshold
-    await cog.monitor(interaction, target="Market Share", metric="percentage", threshold=-1.0)
+    await cog.monitor.callback(cog, interaction, target="Market Share", metric="percentage", threshold=-1.0)
     
     # Test with valid inputs
-    await cog.monitor(interaction, target="Market Share", metric="percentage", threshold=75.0)
+    await cog.monitor.callback(cog, interaction, target="Market Share", metric="percentage", threshold=75.0)
 
 @pytest.mark.asyncio
 async def test_analyze_command_validation(cog, interaction):
     """Test analyze command input validation."""
     # Test with invalid metric (too short)
-    await cog.analyze(interaction, metric="")
+    await cog.analyze.callback(cog, interaction, metric="")
     
     # Test with invalid timeframe
-    await cog.analyze(interaction, metric="Revenue", timeframe="invalid")
+    await cog.analyze.callback(cog, interaction, metric="Revenue", timeframe="invalid")
     
     # Test with valid inputs
-    await cog.analyze(interaction, metric="Revenue", timeframe="1w")
+    await cog.analyze.callback(cog, interaction, metric="Revenue", timeframe="1w")
 
 @pytest.mark.asyncio
 async def test_report_command_validation(cog, interaction):
     """Test report command input validation."""
     # Test with invalid report type
-    await cog.report(interaction, report_type="invalid")
+    await cog.report.callback(cog, interaction, report_type="invalid")
     
     # Test with invalid timeframe
-    await cog.report(interaction, report_type="performance", timeframe="invalid")
+    await cog.report.callback(cog, interaction, report_type="performance", timeframe="invalid")
     
     # Test with valid inputs
-    await cog.report(interaction, report_type="performance", timeframe="1w")
+    await cog.report.callback(cog, interaction, report_type="performance", timeframe="1w")
 
 @pytest.mark.asyncio
 async def test_error_handling(cog, interaction, ctx):
@@ -179,7 +161,7 @@ async def test_error_handling(cog, interaction, ctx):
             raise Exception("Test error")
     
     cog.bot.business_intelligence = ErrorBusinessIntelligence()
-    await cog.research(interaction, topic="Test")
+    await cog.research.callback(cog, interaction, topic="Test")
 
 @pytest.mark.asyncio
 async def test_command_metadata(cog):
